@@ -29,6 +29,7 @@ function route() {
   switch (path) {
     case "home": return renderHome();
     case "shift": return renderShiftDetail(param);
+    case "summary": return renderShiftSummary(param);
     case "calls": return renderCalls();
     case "stats": return renderStats();
     case "codes": return renderCodes();
@@ -43,13 +44,17 @@ function parseHash(hash) {
 }
 
 function setActiveTab(path) {
-  const tab = ["shift"].includes(path) ? "home" : path;
+  const tab = ["shift", "summary"].includes(path) ? "home" : path;
   document.querySelectorAll(".tabbar a").forEach((a) => {
     a.classList.toggle("active", a.dataset.tab === tab);
   });
 }
 
-// ---------- Etusivu: vuorolista ----------
+// ---------- Etusivu: vuorolista / kalenteri ----------
+let homeView = "list";
+const calCursor = new Date();
+calCursor.setDate(1);
+
 function renderHome() {
   const shifts = getShifts();
   const s = computeStats();
@@ -61,12 +66,76 @@ function renderHome() {
       </div>
       <button class="btn primary" id="newShift">+ Vuoro</button>
     </header>
-    ${shifts.length === 0 ? emptyState() : ""}
-    <div class="list">
-      ${shifts.map(shiftCard).join("")}
+    <div class="seg view-seg">
+      <button type="button" data-v="list" class="${homeView === "list" ? "on" : ""}">Lista</button>
+      <button type="button" data-v="calendar" class="${homeView === "calendar" ? "on" : ""}">Kalenteri</button>
     </div>
+    ${shifts.length === 0 ? emptyState() : ""}
+    <div id="home-body"></div>
   `;
   document.getElementById("newShift").onclick = () => openShiftForm();
+  document.querySelectorAll(".view-seg button").forEach((b) => {
+    b.onclick = () => { homeView = b.dataset.v; renderHome(); };
+  });
+  const body = document.getElementById("home-body");
+  if (homeView === "calendar") body.innerHTML = calendarHtml(shifts);
+  else body.innerHTML = `<div class="list">${shifts.map(shiftCard).join("")}</div>`;
+
+  if (homeView === "calendar") {
+    document.getElementById("cal-prev").onclick = () => { calCursor.setMonth(calCursor.getMonth() - 1); renderHome(); };
+    document.getElementById("cal-next").onclick = () => { calCursor.setMonth(calCursor.getMonth() + 1); renderHome(); };
+    body.querySelectorAll("[data-shift]").forEach((el) => { el.onclick = () => { location.hash = `#shift/${el.dataset.shift}`; }; });
+    body.querySelectorAll("[data-newdate]").forEach((el) => { el.onclick = () => openShiftForm({ date: el.dataset.newdate, type: "day" }); });
+  }
+}
+
+function calendarHtml(shifts) {
+  const y = calCursor.getFullYear(), m = calCursor.getMonth();
+  const months = ["Tammikuu", "Helmikuu", "Maaliskuu", "Huhtikuu", "Toukokuu", "Kesäkuu",
+    "Heinäkuu", "Elokuu", "Syyskuu", "Lokakuu", "Marraskuu", "Joulukuu"];
+  const byDate = {};
+  for (const s of shifts) (byDate[s.date] = byDate[s.date] || []).push(s);
+
+  const first = new Date(y, m, 1);
+  let startDow = (first.getDay() + 6) % 7; // ma=0
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const todayIso = today();
+
+  let cells = "";
+  for (let i = 0; i < startDow; i++) cells += `<div class="cal-cell empty"></div>`;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const dayShifts = byDate[iso] || [];
+    const isToday = iso === todayIso;
+    if (dayShifts.length) {
+      const sft = dayShifts[0];
+      const cls = sft.type === "day" ? "day" : sft.type === "night" ? "night" : "custom";
+      const totalCalls = dayShifts.reduce((n, s) => n + (s.calls?.length || 0), 0);
+      cells += `<div class="cal-cell ${cls} ${isToday ? "today" : ""}" data-shift="${sft.id}">
+        <span class="cal-day">${d}</span>
+        <span class="cal-badge">${totalCalls}</span>
+      </div>`;
+    } else {
+      cells += `<div class="cal-cell ${isToday ? "today" : ""}" data-newdate="${iso}"><span class="cal-day">${d}</span></div>`;
+    }
+  }
+
+  return `
+    <div class="cal-head">
+      <button class="iconbtn" id="cal-prev">‹</button>
+      <strong>${months[m]} ${y}</strong>
+      <button class="iconbtn" id="cal-next">›</button>
+    </div>
+    <div class="cal-grid">
+      ${["ma", "ti", "ke", "to", "pe", "la", "su"].map((d) => `<div class="cal-dow">${d}</div>`).join("")}
+      ${cells}
+    </div>
+    <div class="cal-legend">
+      <span><i class="lg day"></i> Päivä 9–21</span>
+      <span><i class="lg night"></i> Yö 21–9</span>
+      <span><i class="lg custom"></i> Muu</span>
+      <span class="muted">Numero = keikat</span>
+    </div>`;
 }
 
 function emptyState() {
@@ -195,7 +264,10 @@ function renderShiftDetail(id) {
         <h1>${formatDate(s.date)}</h1>
         <p class="sub">${head} · ${shiftHours(s)} h${s.unit ? " · " + esc(s.unit) : ""}</p>
       </div>
-      <button class="btn ghost" id="editShift">Muokkaa</button>
+      <div class="head-actions">
+        <button class="btn ghost" id="summaryBtn">Yhteenveto</button>
+        <button class="btn ghost" id="editShift">Muokkaa</button>
+      </div>
     </header>
     ${s.notes ? `<div class="notebox">📝 ${esc(s.notes)}</div>` : ""}
     <div class="section-head">
@@ -207,6 +279,7 @@ function renderShiftDetail(id) {
     </div>
   `;
   document.getElementById("editShift").onclick = () => openShiftForm(s);
+  document.getElementById("summaryBtn").onclick = () => { location.hash = `#summary/${s.id}`; };
   document.getElementById("newCall").onclick = () => openCallForm(s.id);
   app.querySelectorAll("[data-call]").forEach((el) => {
     el.onclick = () => openCallForm(s.id, (s.calls || []).find((c) => c.id === el.dataset.call));
@@ -228,12 +301,94 @@ function callRow(shiftId, c) {
           ${c.time ? `<span class="time">${esc(c.time)}</span>` : ""}
         </div>
         ${c.description ? `<div class="call-desc">${esc(c.description)}</div>` : ""}
+        ${vitalsLine(c.vitals)}
         <div class="call-meta">
           ${c.disposition ? `<span class="meta-pill">${esc(c.disposition)}</span>` : ""}
           ${c.destination ? `<span class="meta-pill dest">${esc(c.destination)}</span>` : ""}
+          ${(c.tags || []).map((t) => `<span class="meta-pill tag">${esc(t)}</span>`).join("")}
         </div>
       </div>
     </div>`;
+}
+
+function vitalsLine(v) {
+  if (!v) return "";
+  const parts = [];
+  if (v.rr) parts.push(`RR ${esc(v.rr)}`);
+  if (v.hr) parts.push(`P ${esc(v.hr)}`);
+  if (v.spo2) parts.push(`SpO₂ ${esc(v.spo2)}`);
+  if (v.gcs) parts.push(`GCS ${esc(v.gcs)}`);
+  return parts.length ? `<div class="vitals-line">${parts.join(" · ")}</div>` : "";
+}
+
+// ---------- Vuoron yhteenveto (tulostettava) ----------
+function renderShiftSummary(id) {
+  const s = getShift(id);
+  if (!s) { location.hash = "#/"; return; }
+  const calls = (s.calls || []).slice().sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+  const head = s.type === "day" ? "Päivävuoro 9–21"
+    : s.type === "night" ? "Yövuoro 21–9"
+      : `Vuoro ${esc(s.startTime || "")}–${esc(s.endTime || "")}`;
+  const urg = { A: 0, B: 0, C: 0, D: 0 };
+  let transported = 0;
+  const tagCount = {};
+  for (const c of calls) {
+    if (urg[c.urgency] != null) urg[c.urgency]++;
+    if (c.disposition === "Kuljetettu") transported++;
+    for (const t of c.tags || []) tagCount[t] = (tagCount[t] || 0) + 1;
+  }
+  const tagSummary = Object.entries(tagCount).map(([t, n]) => `${esc(t)}${n > 1 ? " ×" + n : ""}`).join(", ");
+
+  app.innerHTML = `
+    <div class="no-print page-head">
+      <a class="back" href="#shift/${s.id}">‹ Takaisin</a>
+      <button class="btn primary" id="printBtn">🖨️ Tulosta / Tallenna PDF</button>
+    </div>
+    <article class="print-view">
+      <div class="pv-head">
+        <h1>KenttäLog – vuoroyhteenveto</h1>
+        <div class="pv-meta">
+          <strong>${formatDate(s.date)}</strong> · ${head} · ${shiftHours(s)} h
+          ${s.unit ? "<br>Yksikkö: " + esc(s.unit) : ""}${s.station ? " · " + esc(s.station) : ""}
+        </div>
+      </div>
+
+      <div class="pv-stats">
+        <span><b>${calls.length}</b> keikkaa</span>
+        <span><b>${transported}</b> kuljetusta</span>
+        <span>A:${urg.A} B:${urg.B} C:${urg.C} D:${urg.D}</span>
+      </div>
+      ${tagSummary ? `<p class="pv-tags"><b>Merkittävät tapaukset:</b> ${tagSummary}</p>` : ""}
+
+      <table class="pv-table">
+        <thead>
+          <tr><th>Aika</th><th>Aste</th><th>Koodi</th><th>Tehtävä</th><th>Kuvaus</th><th>Peruselintoiminnot</th><th>Kuljetus</th></tr>
+        </thead>
+        <tbody>
+          ${calls.length ? calls.map((c) => {
+            const v = c.vitals;
+            const vs = v ? [v.rr && "RR " + v.rr, v.hr && "P " + v.hr, v.spo2 && "SpO₂ " + v.spo2, v.gcs && "GCS " + v.gcs].filter(Boolean).join(", ") : "";
+            const disp = [c.disposition, c.destination].filter(Boolean).join(": ");
+            const tags = (c.tags || []).length ? `<div class="pv-rowtags">${(c.tags || []).map(esc).join(", ")}</div>` : "";
+            return `<tr>
+              <td>${esc(c.time || "")}</td>
+              <td>${esc(c.urgency || "")}</td>
+              <td>${esc(c.code || "")}</td>
+              <td>${esc(c.codeName || "")}</td>
+              <td>${esc(c.description || "")}${tags}</td>
+              <td>${esc(vs)}</td>
+              <td>${esc(disp)}</td>
+            </tr>`;
+          }).join("") : `<tr><td colspan="7" class="muted">Ei keikkoja.</td></tr>`}
+        </tbody>
+      </table>
+
+      ${s.notes ? `<div class="pv-notes"><h2>Oppimispäiväkirja</h2><p>${esc(s.notes)}</p></div>` : ""}
+
+      <p class="pv-foot">Henkilökohtainen oppimispäiväkirja. Ei sisällä potilaan tunnistetietoja. Ei virallinen potilasasiakirja.</p>
+    </article>
+  `;
+  document.getElementById("printBtn").onclick = () => window.print();
 }
 
 // ---------- Keikan lisäys / muokkaus ----------
@@ -270,9 +425,27 @@ function openCallForm(shiftId, existing) {
         ${settings.destinations.map((d) => `<option value="${esc(d)}">`).join("")}
       </datalist>
     </label>
+    <label>Merkittävät tapaukset / toimenpiteet
+      <div class="chips" id="c-tags">
+        ${settings.tags.map((t) => `<button type="button" class="chip ${(c.tags || []).includes(t) ? "on" : ""}" data-tag="${esc(t)}">${esc(t)}</button>`).join("")}
+      </div>
+      <input type="text" id="c-tagextra" placeholder="Muu, lisää pilkulla eroteltuna" value="${esc((c.tags || []).filter((t) => !settings.tags.includes(t)).join(", "))}">
+    </label>
+    <label>Peruselintoiminnot (vapaaehtoinen)
+      <div class="vitals">
+        <span><small>RR</small><input type="text" id="v-rr" inputmode="numeric" value="${esc(c.vitals?.rr || "")}" placeholder="120/80"></span>
+        <span><small>Pulssi</small><input type="text" id="v-hr" inputmode="numeric" value="${esc(c.vitals?.hr || "")}" placeholder="72"></span>
+        <span><small>SpO₂</small><input type="text" id="v-spo2" inputmode="numeric" value="${esc(c.vitals?.spo2 || "")}" placeholder="98%"></span>
+        <span><small>GCS</small><input type="text" id="v-gcs" inputmode="numeric" value="${esc(c.vitals?.gcs || "")}" placeholder="15"></span>
+      </div>
+    </label>
   `, {
     onSave: () => {
       const code = val("c-codesearch").trim().toUpperCase();
+      const chipTags = [...document.querySelectorAll("#c-tags .chip.on")].map((b) => b.dataset.tag);
+      const extraTags = splitList(val("c-tagextra"));
+      const vitals = { rr: val("v-rr"), hr: val("v-hr"), spo2: val("v-spo2"), gcs: val("v-gcs") };
+      const hasVitals = Object.values(vitals).some((v) => v.trim());
       const patch = {
         time: val("c-time"),
         urgency: document.querySelector("#c-urg .on")?.dataset.u || "",
@@ -282,6 +455,8 @@ function openCallForm(shiftId, existing) {
         description: val("c-desc"),
         disposition: val("c-disp"),
         destination: val("c-disp") === "Kuljetettu" ? val("c-dest") : "",
+        tags: [...new Set([...chipTags, ...extraTags])],
+        vitals: hasVitals ? vitals : null,
       };
       if (existing) updateCall(shiftId, existing.id, patch);
       else addCall(shiftId, patch);
@@ -314,6 +489,9 @@ function openCallForm(shiftId, existing) {
   document.getElementById("c-disp").onchange = (e) => {
     document.getElementById("c-destwrap").style.display = e.target.value === "Kuljetettu" ? "" : "none";
   };
+  document.querySelectorAll("#c-tags .chip").forEach((b) => {
+    b.onclick = () => b.classList.toggle("on");
+  });
 }
 
 function codeHint(code) {
@@ -409,6 +587,11 @@ function renderStats() {
     <div class="list compact">
       ${s.topDest.length ? s.topDest.map(([d, n]) => `<div class="ranked"><span class="cname">${esc(d)}</span><span class="rcount">${n}</span></div>`).join("") : `<p class="muted">Ei kuljetuksia.</p>`}
     </div>
+
+    <h2 class="block-h">Merkittävät tapaukset / toimenpiteet</h2>
+    <div class="list compact">
+      ${s.topTags.length ? s.topTags.map(([t, n]) => `<div class="ranked"><span class="cname">${esc(t)}</span><span class="rcount">${n}</span></div>`).join("") : `<p class="muted">Ei merkintöjä vielä.</p>`}
+    </div>
   `;
 }
 
@@ -467,6 +650,12 @@ function renderSettings() {
     </section>
 
     <section class="settings-block">
+      <h2>Merkittävät tapaukset / toimenpiteet</h2>
+      <p class="muted">Pikavalintojen tagit keikkalomakkeessa, pilkulla eroteltuna.</p>
+      <textarea id="set-tags" rows="3">${esc(st.tags.join(", "))}</textarea>
+    </section>
+
+    <section class="settings-block">
       <h2>Yksiköt</h2>
       <textarea id="set-units" rows="2">${esc(st.units.join(", "))}</textarea>
       <button class="btn primary" id="saveSettings">Tallenna asetukset</button>
@@ -501,6 +690,7 @@ function renderSettings() {
     updateSettings({
       destinations: splitList(val("set-dest")),
       units: splitList(val("set-units")),
+      tags: splitList(val("set-tags")),
     });
     toast("Asetukset tallennettu");
   };

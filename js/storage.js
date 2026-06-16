@@ -21,6 +21,16 @@ const DEFAULT_DATA = {
       "Terveyskeskus",
     ],
     units: ["Hoitotaso", "Perustaso", "Kenttäjohto (EVY)"],
+    tags: [
+      "Kardioversio",
+      "PTT-trauma",
+      "Elvytys",
+      "Intubaatio",
+      "Synnytys",
+      "Monipotilastilanne",
+      "Lääkkeellinen rauhoittaminen",
+      "Hätäsiirto",
+    ],
   },
 };
 
@@ -165,7 +175,7 @@ export function clearAll() {
 
 export function exportCSV() {
   const rows = [
-    ["Pvm", "Vuoro", "Aika", "Koodi", "Tehtävä", "Hälytysaste", "Johtovastuu", "Kuljetus", "Kohde", "Kuvaus"],
+    ["Pvm", "Vuoro", "Aika", "Koodi", "Tehtävä", "Hälytysaste", "Johtovastuu", "Kuljetus", "Kohde", "Tagit", "RR", "Pulssi", "SpO2", "GCS", "Kuvaus"],
   ];
   const calls = getAllCalls().sort((a, b) => {
     const da = a.shift.date + (a.time || "");
@@ -183,6 +193,11 @@ export function exportCSV() {
       c.lead || "",
       c.disposition || "",
       c.destination || "",
+      (c.tags || []).join(", "),
+      c.vitals?.rr || "",
+      c.vitals?.hr || "",
+      c.vitals?.spo2 || "",
+      c.vitals?.gcs || "",
       (c.description || "").replace(/\s+/g, " ").trim(),
     ]);
   }

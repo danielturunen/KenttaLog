@@ -10,6 +10,7 @@ export function computeStats() {
   const byLead = {};
   const byCode = {};
   const byDest = {};
+  const byTag = {};
   let transported = 0;
 
   for (const c of calls) {
@@ -17,6 +18,7 @@ export function computeStats() {
     const lead = c.lead || (CODE_MAP.get(c.code)?.lead) || "Muu";
     byLead[lead] = (byLead[lead] || 0) + 1;
     if (c.code) byCode[c.code] = (byCode[c.code] || 0) + 1;
+    for (const t of c.tags || []) byTag[t] = (byTag[t] || 0) + 1;
     if (c.disposition === "Kuljetettu") {
       transported++;
       const d = c.destination || "Ei kohdetta";
@@ -30,8 +32,10 @@ export function computeStats() {
     .map(([code, n]) => ({ code, n, name: CODE_MAP.get(code)?.name || "" }));
 
   const topDest = Object.entries(byDest).sort((a, b) => b[1] - a[1]);
+  const topTags = Object.entries(byTag).sort((a, b) => b[1] - a[1]);
 
   return {
+    topTags,
     shiftCount: shifts.length,
     callCount: calls.length,
     callsPerShift: shifts.length ? (calls.length / shifts.length).toFixed(1) : "0",
