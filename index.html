@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0e7c45">
+  <meta name="description" content="KenttäLog – ensihoidon vuorojen ja keikkojen kirjaaminen">
+  <title>KenttäLog</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icons/icon.svg">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main id="app" class="container"></main>
+
+  <nav class="tabbar">
+    <a href="#/" data-tab="home"><span class="ti">🚑</span><span>Vuorot</span></a>
+    <a href="#calls" data-tab="calls"><span class="ti">📋</span><span>Keikat</span></a>
+    <a href="#stats" data-tab="stats"><span class="ti">📊</span><span>Tilastot</span></a>
+    <a href="#codes" data-tab="codes"><span class="ti">🔢</span><span>Koodit</span></a>
+    <a href="#settings" data-tab="settings"><span class="ti">⚙️</span><span>Asetukset</span></a>
+  </nav>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>

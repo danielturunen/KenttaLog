@@ -1,0 +1,26 @@
+{
+  "name": "KenttäLog – Ensihoidon vuoro- ja keikkapäiväkirja",
+  "short_name": "KenttäLog",
+  "description": "Kirjaa ensihoidon vuorot ja keikat: tehtäväkoodit, hälytysasteet, kuljetukset ja tilastot.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#11151a",
+  "theme_color": "#0e7c45",
+  "lang": "fi",
+  "icons": [
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
