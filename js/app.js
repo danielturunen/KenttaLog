@@ -34,6 +34,7 @@ function route() {
     : ["home", null];
   setActiveTab(path);
   window.scrollTo(0, 0);
+  applyAccent(); // oletusaseman teema; vuoronäkymät korvaavat omalla asemallaan
   switch (path) {
     case "home": return renderHome();
     case "shift": return renderShiftDetail(param);
@@ -293,6 +294,7 @@ function openShiftForm(existing) {
 function renderShiftDetail(id) {
   const s = getShift(id);
   if (!s) { location.hash = "#/"; return; }
+  applyShiftAccent(s);
   const calls = (s.calls || []).slice();
   const head = s.type === "day" ? "Päivävuoro 9–21"
     : s.type === "night" ? "Yövuoro 21–9"
@@ -366,6 +368,7 @@ function vitalsLine(v) {
 function renderShiftSummary(id) {
   const s = getShift(id);
   if (!s) { location.hash = "#/"; return; }
+  applyShiftAccent(s);
   const calls = (s.calls || []).slice().sort((a, b) => (a.time || "").localeCompare(b.time || ""));
   const head = s.type === "day" ? "Päivävuoro 9–21"
     : s.type === "night" ? "Yövuoro 21–9"
@@ -914,13 +917,22 @@ function toast(msg) {
 }
 
 // ---------- Asemateema ----------
-function applyAccent() {
-  const station = findStation(getSettings().defaultStation);
-  const color = station?.color || DEFAULT_ACCENT;
+function setAccentColor(color) {
   document.documentElement.style.setProperty("--primary", color);
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute("content", color);
+}
+function applyAccent() {
+  const station = findStation(getSettings().defaultStation);
+  setAccentColor(station?.color || DEFAULT_ACCENT);
   updateStationChip(station);
+}
+function applyShiftAccent(shift) {
+  const station = findStation(shift.station);
+  if (station) {
+    setAccentColor(station.color);
+    updateStationChip(station);
+  }
 }
 function updateStationChip(station) {
   const chip = document.getElementById("stationChip");
