@@ -17,13 +17,12 @@ function unitOptions(units) {
 }
 
 const app = document.getElementById("app");
+const X_OUTCOMES = CODE_GROUPS.find((g) => g.id === "x").categories[0].codes
+  .map(([code, name]) => `${code} – ${name}`);
 const DISPOSITIONS = [
   "Kuljetettu",
   "Ohjattu omalla kyydillä",
-  "Ei kuljetusta (X-5)",
-  "Hoidettu kohteessa (X-8)",
-  "Potilas kieltäytyi (X-6)",
-  "Tehtävä peruuntui (X-9)",
+  ...X_OUTCOMES,
   "Muu",
 ];
 
@@ -345,6 +344,7 @@ function callRow(shiftId, c) {
         <div class="call-meta">
           ${c.disposition ? `<span class="meta-pill">${esc(c.disposition)}</span>` : ""}
           ${c.destination ? `<span class="meta-pill dest">${esc(c.destination)}</span>` : ""}
+          ${c.disposition === "Kuljetettu" && c.transportCode ? `<span class="meta-pill">Kulj. ${esc(c.transportCode)}${c.transportUrgency ? " " + esc(c.transportUrgency) : ""}</span>` : ""}
           ${(c.tags || []).map((t) => `<span class="meta-pill tag">${esc(t)}</span>`).join("")}
         </div>
       </div>
@@ -408,7 +408,10 @@ function renderShiftSummary(id) {
           ${calls.length ? calls.map((c) => {
             const v = c.vitals;
             const vs = v ? [v.rr && "RR " + v.rr, v.hr && "P " + v.hr, v.spo2 && "SpO₂ " + v.spo2, v.gcs && "GCS " + v.gcs].filter(Boolean).join(", ") : "";
-            const disp = [c.disposition, c.destination].filter(Boolean).join(": ");
+            let disp = [c.disposition, c.destination].filter(Boolean).join(": ");
+            if (c.disposition === "Kuljetettu" && c.transportCode) {
+              disp += ` (${c.transportCode}${c.transportUrgency ? " " + c.transportUrgency : ""})`;
+            }
             const tags = (c.tags || []).length ? `<div class="pv-rowtags">${(c.tags || []).map(esc).join(", ")}</div>` : "";
             return `<tr>
               <td>${esc(c.time || "")}</td>
@@ -459,12 +462,24 @@ function openCallForm(shiftId, existing) {
         ${DISPOSITIONS.map((d) => `<option ${c.disposition === d ? "selected" : ""}>${esc(d)}</option>`).join("")}
       </select>
     </label>
-    <label id="c-destwrap" style="${c.disposition === "Kuljetettu" ? "" : "display:none"}">Kuljetuskohde
-      <input type="text" id="c-dest" list="destlist" value="${esc(c.destination || "")}" placeholder="esim. Meilahti">
-      <datalist id="destlist">
-        ${settings.destinations.map((d) => `<option value="${esc(d)}">`).join("")}
-      </datalist>
-    </label>
+    <div id="c-destwrap" style="${c.disposition === "Kuljetettu" ? "" : "display:none"}">
+      <label>Kuljetuskohde
+        <input type="text" id="c-dest" list="destlist" value="${esc(c.destination || "")}" placeholder="esim. Meilahti">
+        <datalist id="destlist">
+          ${settings.destinations.map((d) => `<option value="${esc(d)}">`).join("")}
+        </datalist>
+      </label>
+      <div class="row">
+        <label>Kuljetuskoodi
+          <input type="text" id="c-tcode" list="codelist" value="${esc(c.transportCode || c.code || "")}" placeholder="oletus = hälytyskoodi" autocomplete="off">
+        </label>
+        <label>Kuljetuksen kiireellisyys
+          <div class="seg urg-seg" id="c-turg">
+            ${["A", "B", "C", "D"].map((k) => `<button type="button" data-u="${k}" class="${(c.transportUrgency || c.urgency) === k ? "on" : ""}" style="--uc:${URGENCY[k].color}">${k}</button>`).join("")}
+          </div>
+        </label>
+      </div>
+    </div>
     <label>Merkittävät tapaukset / toimenpiteet
       <div class="chips" id="c-tags">
         ${settings.tags.map((t) => `<button type="button" class="chip ${(c.tags || []).includes(t) ? "on" : ""}" data-tag="${esc(t)}">${esc(t)}</button>`).join("")}
@@ -482,19 +497,28 @@ function openCallForm(shiftId, existing) {
   `, {
     onSave: () => {
       const code = val("c-codesearch").trim().toUpperCase();
+      const urgency = document.querySelector("#c-urg .on")?.dataset.u || "";
       const chipTags = [...document.querySelectorAll("#c-tags .chip.on")].map((b) => b.dataset.tag);
       const extraTags = splitList(val("c-tagextra"));
       const vitals = { rr: val("v-rr"), hr: val("v-hr"), spo2: val("v-spo2"), gcs: val("v-gcs") };
       const hasVitals = Object.values(vitals).some((v) => v.trim());
+      const disposition = val("c-disp");
+      const transported = disposition === "Kuljetettu";
+      // Kuljetuskoodi/-kiireellisyys: oletus = hälytyskoodi/-aste (millä HäKe hälytti)
+      const transportCode = transported ? (val("c-tcode").trim().toUpperCase() || code) : "";
+      const transportUrgency = transported ? (document.querySelector("#c-turg .on")?.dataset.u || urgency) : "";
       const patch = {
         time: val("c-time"),
-        urgency: document.querySelector("#c-urg .on")?.dataset.u || "",
+        urgency,
         code,
         codeName: CODE_MAP.get(code)?.name || "",
         lead: CODE_MAP.get(code)?.lead || "",
         description: val("c-desc"),
-        disposition: val("c-disp"),
-        destination: val("c-disp") === "Kuljetettu" ? val("c-dest") : "",
+        disposition,
+        destination: transported ? val("c-dest") : "",
+        transportCode,
+        transportCodeName: CODE_MAP.get(transportCode)?.name || "",
+        transportUrgency,
         tags: [...new Set([...chipTags, ...extraTags])],
         vitals: hasVitals ? vitals : null,
       };
@@ -516,15 +540,29 @@ function openCallForm(shiftId, existing) {
     } : null,
   });
 
+  // Onko kuljetuskenttiä muokattu käsin? Jos ei, ne peilaavat hälytyskoodia/-astetta.
+  let tcodeEdited = !!(existing && existing.transportCode && existing.transportCode !== existing.code);
+  let turgEdited = !!(existing && existing.transportUrgency && existing.transportUrgency !== existing.urgency);
+  const tcodeEl = document.getElementById("c-tcode");
+  tcodeEl.addEventListener("input", () => { tcodeEdited = true; });
+
+  function selectUrg(container, value) {
+    container.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x.dataset.u === value));
+  }
+
   document.querySelectorAll("#c-urg button").forEach((b) => {
     b.onclick = () => {
-      document.querySelectorAll("#c-urg button").forEach((x) => x.classList.remove("on"));
-      b.classList.add("on");
+      selectUrg(document.getElementById("c-urg"), b.dataset.u);
+      if (!turgEdited) selectUrg(document.getElementById("c-turg"), b.dataset.u);
     };
+  });
+  document.querySelectorAll("#c-turg button").forEach((b) => {
+    b.onclick = () => { turgEdited = true; selectUrg(document.getElementById("c-turg"), b.dataset.u); };
   });
   const search = document.getElementById("c-codesearch");
   search.oninput = () => {
     document.getElementById("c-codehint").innerHTML = codeHint(search.value.trim().toUpperCase());
+    if (!tcodeEdited) tcodeEl.value = search.value.trim().toUpperCase();
   };
   document.getElementById("c-disp").onchange = (e) => {
     document.getElementById("c-destwrap").style.display = e.target.value === "Kuljetettu" ? "" : "none";
