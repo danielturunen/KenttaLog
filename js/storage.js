@@ -19,7 +19,10 @@ const DEFAULT_DATA = {
       "Töölö",
       "Terveyskeskus",
     ],
-    units: ["Hoitotaso", "Perustaso", "Kenttäjohto (EVY)"],
+    units: [],
+    defaultStation: "",
+    defaultUnit: "",
+    defaultHt: true,
     tags: [
       "Kardioversio",
       "PTT-trauma",

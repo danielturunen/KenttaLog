@@ -159,13 +159,15 @@ function shiftCard(s) {
     const col = URGENCY[c.urgency]?.color || "#888";
     return `<span class="dot" style="background:${col}" title="${esc(c.code || "")}"></span>`;
   }).join("");
+  const level = s.ht === false ? `<span class="pill pt">PT</span>` : `<span class="pill ht">HT</span>`;
+  const sub = [s.unit, s.station].filter(Boolean).map(esc).join(" · ");
   return `
     <a class="card" href="#shift/${s.id}">
       <div class="card-top">
         <div class="date">${formatDate(s.date)}</div>
-        ${tag}
+        <span class="pills">${level}${tag}</span>
       </div>
-      ${s.unit ? `<div class="muted">${esc(s.unit)}${s.station ? " · " + esc(s.station) : ""}</div>` : ""}
+      ${sub ? `<div class="muted">${sub}</div>` : ""}
       <div class="card-bottom">
         <span class="count">${calls.length} keikkaa</span>
         <span class="dots">${dots}</span>
@@ -176,9 +178,16 @@ function shiftCard(s) {
 // ---------- Vuoron lisäys / muokkaus ----------
 function openShiftForm(existing) {
   const settings = getSettings();
-  const s = existing || { date: today(), type: "day", unit: settings.units[0] || "" };
+  const s = existing || {
+    date: today(),
+    type: "day",
+    unit: settings.defaultUnit || "",
+    station: settings.defaultStation || "",
+    ht: settings.defaultHt !== false,
+  };
   const isDay = s.type === "day", isNight = s.type === "night";
   const isCustom = !isDay && !isNight;
+  const isHt = s.ht !== false;
   openModal(existing ? "Muokkaa vuoroa" : "Uusi vuoro", `
     <label>Päivämäärä
       <input type="date" id="f-date" value="${esc(s.date)}">
@@ -194,11 +203,17 @@ function openShiftForm(existing) {
       <label>Alku<input type="time" id="f-start" value="${esc(s.startTime || "")}"></label>
       <label>Loppu<input type="time" id="f-end" value="${esc(s.endTime || "")}"></label>
     </div>
+    <label>Taso
+      <div class="seg" id="f-ht">
+        <button type="button" data-ht="1" class="${isHt ? "on" : ""}">Hoitotaso (HT)</button>
+        <button type="button" data-ht="0" class="${isHt ? "" : "on"}">Perustaso (PT)</button>
+      </div>
+    </label>
     <label>Yksikkö
-      <select id="f-unit">
-        <option value=""></option>
-        ${settings.units.map((u) => `<option ${s.unit === u ? "selected" : ""}>${esc(u)}</option>`).join("")}
-      </select>
+      <input type="text" id="f-unit" list="unitlist" value="${esc(s.unit || "")}" placeholder="esim. EVY161">
+      <datalist id="unitlist">
+        ${settings.units.map((u) => `<option value="${esc(u)}">`).join("")}
+      </datalist>
     </label>
     <label>Asema / tukikohta
       <input type="text" id="f-station" value="${esc(s.station || "")}" placeholder="esim. Malmi, Töölö">
@@ -214,6 +229,7 @@ function openShiftForm(existing) {
         type,
         startTime: type === "custom" ? val("f-start") : "",
         endTime: type === "custom" ? val("f-end") : "",
+        ht: (document.querySelector("#f-ht .on")?.dataset.ht ?? "1") === "1",
         unit: val("f-unit"),
         station: val("f-station"),
         notes: val("f-notes"),
@@ -247,6 +263,13 @@ function openShiftForm(existing) {
       document.getElementById("f-customtimes").style.display = b.dataset.t === "custom" ? "" : "none";
     };
   });
+  // tasovalinnan logiikka
+  document.querySelectorAll("#f-ht button").forEach((b) => {
+    b.onclick = () => {
+      document.querySelectorAll("#f-ht button").forEach((x) => x.classList.remove("on"));
+      b.classList.add("on");
+    };
+  });
 }
 
 // ---------- Vuoron tarkka näkymä + keikat ----------
@@ -262,7 +285,7 @@ function renderShiftDetail(id) {
       <div>
         <a class="back" href="#/">‹ Vuorot</a>
         <h1>${formatDate(s.date)}</h1>
-        <p class="sub">${head} · ${shiftHours(s)} h${s.unit ? " · " + esc(s.unit) : ""}</p>
+        <p class="sub">${s.ht === false ? "PT" : "HT"} · ${head} · ${shiftHours(s)} h${s.unit ? " · " + esc(s.unit) : ""}${s.station ? " · " + esc(s.station) : ""}</p>
       </div>
       <div class="head-actions">
         <button class="btn ghost" id="summaryBtn">Yhteenveto</button>
@@ -348,7 +371,7 @@ function renderShiftSummary(id) {
       <div class="pv-head">
         <h1>KenttäLog – vuoroyhteenveto</h1>
         <div class="pv-meta">
-          <strong>${formatDate(s.date)}</strong> · ${head} · ${shiftHours(s)} h
+          <strong>${formatDate(s.date)}</strong> · ${s.ht === false ? "Perustaso (PT)" : "Hoitotaso (HT)"} · ${head} · ${shiftHours(s)} h
           ${s.unit ? "<br>Yksikkö: " + esc(s.unit) : ""}${s.station ? " · " + esc(s.station) : ""}
         </div>
       </div>
@@ -648,8 +671,20 @@ function renderSettings() {
     </section>
 
     <section class="settings-block">
-      <h2>Yksiköt</h2>
-      <textarea id="set-units" rows="2">${esc(st.units.join(", "))}</textarea>
+      <h2>Vuoron oletukset</h2>
+      <p class="muted">Esitäytetään automaattisesti uuteen vuoroon.</p>
+      <label class="field">Oletusasema
+        <input type="text" id="set-defstation" value="${esc(st.defaultStation || "")}" placeholder="esim. Malmi">
+      </label>
+      <label class="field">Oletusyksikkö
+        <input type="text" id="set-defunit" value="${esc(st.defaultUnit || "")}" placeholder="esim. EVY161">
+      </label>
+      <label class="field">Oletustaso
+        <select id="set-defht">
+          <option value="1" ${st.defaultHt !== false ? "selected" : ""}>Hoitotaso (HT)</option>
+          <option value="0" ${st.defaultHt === false ? "selected" : ""}>Perustaso (PT)</option>
+        </select>
+      </label>
       <button class="btn primary" id="saveSettings">Tallenna asetukset</button>
     </section>
 
@@ -674,8 +709,10 @@ function renderSettings() {
   document.getElementById("saveSettings").onclick = () => {
     updateSettings({
       destinations: splitList(val("set-dest")),
-      units: splitList(val("set-units")),
       tags: splitList(val("set-tags")),
+      defaultStation: val("set-defstation").trim(),
+      defaultUnit: val("set-defunit").trim(),
+      defaultHt: val("set-defht") === "1",
     });
     toast("Asetukset tallennettu");
   };
