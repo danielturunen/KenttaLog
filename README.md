@@ -22,7 +22,7 @@ Erillistä palvelinta ei tarvita.
   johtovastuun jakauma, yleisimmät koodit ja kuljetuskohteet, kirjatut tunnit.
 - **Haku & suodatus** kaikista keikoista.
 - **Varmuuskopio** – vienti/tuonti (JSON) ja keikkojen CSV-vienti.
-- **Tumma tila** (kätevä yövuoroissa) ja automaattinen teema.
+- **Tumma teema** – silmäystävällinen erityisesti yövuoroissa.
 
 ## Käyttö
 

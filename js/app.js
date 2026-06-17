@@ -636,14 +636,6 @@ function renderSettings() {
     <header class="page-head"><h1>Asetukset</h1></header>
 
     <section class="settings-block">
-      <h2>Ulkoasu</h2>
-      <div class="seg" id="theme-seg">
-        ${[["auto", "Automaattinen"], ["light", "Vaalea"], ["dark", "Tumma"]].map(([v, l]) =>
-          `<button type="button" data-th="${v}" class="${st.theme === v ? "on" : ""}">${l}</button>`).join("")}
-      </div>
-    </section>
-
-    <section class="settings-block">
       <h2>Kuljetuskohteet</h2>
       <p class="muted">Pilkulla eroteltuna. Näkyvät keikkalomakkeen ehdotuksissa.</p>
       <textarea id="set-dest" rows="3">${esc(st.destinations.join(", "))}</textarea>
@@ -679,13 +671,6 @@ function renderSettings() {
 
     <p class="footnote">🔒 Tietosuoja: KenttäLog on henkilökohtainen oppimispäiväkirja. Älä koskaan kirjaa potilaan tunnistetietoja. Tiedot eivät poistu laitteeltasi.</p>
   `;
-  document.querySelectorAll("#theme-seg button").forEach((b) => {
-    b.onclick = () => {
-      updateSettings({ theme: b.dataset.th });
-      applyTheme();
-      renderSettings();
-    };
-  });
   document.getElementById("saveSettings").onclick = () => {
     updateSettings({
       destinations: splitList(val("set-dest")),
@@ -751,12 +736,6 @@ function closeModal() {
 }
 
 // ---------- Apufunktiot ----------
-function applyTheme() {
-  const t = getSettings().theme;
-  const dark = t === "dark" || (t === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-  document.documentElement.dataset.theme = dark ? "dark" : "light";
-}
-
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
 }
@@ -795,8 +774,6 @@ function toast(msg) {
 }
 
 // ---------- Käynnistys ----------
-applyTheme();
-window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
 window.addEventListener("hashchange", route);
 route();
 

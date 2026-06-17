@@ -8,7 +8,6 @@ const DEFAULT_DATA = {
   version: 1,
   shifts: [],
   settings: {
-    theme: "auto",
     destinations: [
       "Meilahti",
       "Malmi",
