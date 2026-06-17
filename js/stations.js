@@ -2,17 +2,25 @@
 // Lähde: käyttäjän toimittama asemalista.
 
 export const STATIONS = [
-  { code: "AS.10", name: "Kallio", full: "Kallion keskuspelastusasema", address: "Agricolankatu 15, 00530 Helsinki", units: ["HE1211", "HE1311", "HE1312"] },
-  { code: "AS.20", name: "Erottaja", full: "Erottajan pelastusasema", address: "Korkeavuorenkatu 26, 00130 Helsinki", units: ["HE1321"] },
-  { code: "AS.21", name: "Jätkäsaari", full: "Jätkäsaaren pelastusasema", address: "Tyynenmerenkatu 1, 00220 Helsinki", units: ["HE1322"], note: "Vuoronvaihto Erottajalla" },
-  { code: "AS.30", name: "Haaga", full: "Haagan pelastusasema", address: "Vanha Turun maantie 2, 00320 Helsinki", units: ["HE1231"] },
-  { code: "AS.31", name: "Konala", full: "Konalan pelastusasema", address: "Muonamiehentie 13, 00390 Helsinki", units: ["HE1331"] },
-  { code: "AS.40", name: "Käpylä", full: "Käpylän pelastusasema", address: "Kullervonkatu 7, 00600 Helsinki", units: ["HE1341", "HE1342"] },
-  { code: "AS.50", name: "Malmi", full: "Malmin pelastusasema", address: "Malmin lentoasema, 00700 Helsinki", units: ["HE1251", "HE1252"] },
-  { code: "AS.60", name: "Mellunkylä", full: "Mellunkylän pelastusasema", address: "Linnanpajantie 6, 00950 Helsinki", units: ["HE1261", "HE1362", "HE1363"] },
-  { code: "AS.61", name: "Kontula", full: "Kontulan pelastusasema", address: "Lirokuja 6, 00940 Helsinki", units: ["HE1361"] },
-  { code: "AS.70", name: "Herttoniemi", full: "Herttoniemen pelastusasema", address: "Sorvaajankatu 16, 00880 Helsinki", units: ["HE1371"] },
+  { code: "AS.10", name: "Kallio", full: "Kallion keskuspelastusasema", address: "Agricolankatu 15, 00530 Helsinki", units: ["HE1211", "HE1311", "HE1312"], color: "#e5484d" },
+  { code: "AS.20", name: "Erottaja", full: "Erottajan pelastusasema", address: "Korkeavuorenkatu 26, 00130 Helsinki", units: ["HE1321"], color: "#e8731f" },
+  { code: "AS.21", name: "Jätkäsaari", full: "Jätkäsaaren pelastusasema", address: "Tyynenmerenkatu 1, 00220 Helsinki", units: ["HE1322"], note: "Vuoronvaihto Erottajalla", color: "#d8a200" },
+  { code: "AS.30", name: "Haaga", full: "Haagan pelastusasema", address: "Vanha Turun maantie 2, 00320 Helsinki", units: ["HE1231"], color: "#46a758" },
+  { code: "AS.31", name: "Konala", full: "Konalan pelastusasema", address: "Muonamiehentie 13, 00390 Helsinki", units: ["HE1331"], color: "#12a594" },
+  { code: "AS.40", name: "Käpylä", full: "Käpylän pelastusasema", address: "Kullervonkatu 7, 00600 Helsinki", units: ["HE1341", "HE1342"], color: "#0ea5b7" },
+  { code: "AS.50", name: "Malmi", full: "Malmin pelastusasema", address: "Malmin lentoasema, 00700 Helsinki", units: ["HE1251", "HE1252"], color: "#3b82f6" },
+  { code: "AS.60", name: "Mellunkylä", full: "Mellunkylän pelastusasema", address: "Linnanpajantie 6, 00950 Helsinki", units: ["HE1261", "HE1362", "HE1363"], color: "#6366f1" },
+  { code: "AS.61", name: "Kontula", full: "Kontulan pelastusasema", address: "Lirokuja 6, 00940 Helsinki", units: ["HE1361"], color: "#8b5cf6" },
+  { code: "AS.70", name: "Herttoniemi", full: "Herttoniemen pelastusasema", address: "Sorvaajankatu 16, 00880 Helsinki", units: ["HE1371"], color: "#d6409f" },
 ];
+
+// Oletuskorostusväri kun asemaa ei ole valittu.
+export const DEFAULT_ACCENT = "#1f9d57";
+
+// Aseman tunnusväri vapaan syötteen perusteella (tai oletus).
+export function stationColor(value) {
+  return findStation(value)?.color || null;
+}
 
 // Aseman näyttönimi esim. "Malmi (AS.50)"
 export function stationLabel(s) {

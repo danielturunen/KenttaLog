@@ -6,7 +6,7 @@ import {
 } from "./storage.js";
 import { CODE_GROUPS, CODE_MAP, ALL_CODES, URGENCY } from "./codes.js";
 import { computeStats, shiftHours } from "./stats.js";
-import { STATIONS, stationLabel, ALL_UNITS, findStation } from "./stations.js";
+import { STATIONS, stationLabel, ALL_UNITS, findStation, stationColor, DEFAULT_ACCENT } from "./stations.js";
 
 // Datalist-optiot asemille ja yksiköille (yhteiskäyttö lomakkeissa).
 function stationOptions() {
@@ -169,13 +169,14 @@ function shiftCard(s) {
   }).join("");
   const level = s.ht === false ? `<span class="pill pt">PT</span>` : `<span class="pill ht">HT</span>`;
   const sub = [s.unit, s.station].filter(Boolean).map(esc).join(" · ");
+  const accent = stationColor(s.station) || "var(--primary)";
   return `
-    <a class="card" href="#shift/${s.id}">
+    <a class="card shift-card" href="#shift/${s.id}" style="--sc:${accent}">
       <div class="card-top">
         <div class="date">${formatDate(s.date)}</div>
         <span class="pills">${level}${tag}</span>
       </div>
-      ${sub ? `<div class="muted">${sub}</div>` : ""}
+      ${sub ? `<div class="muted card-sub">${sub}</div>` : ""}
       <div class="card-bottom">
         <span class="count">${calls.length} keikkaa</span>
         <span class="dots">${dots}</span>
@@ -634,27 +635,58 @@ function renderCalls() {
 // ---------- Tilastot ----------
 function renderStats() {
   const s = computeStats();
+  if (s.callCount === 0) {
+    app.innerHTML = `
+      <header class="page-head"><h1>Tilastot</h1></header>
+      <div class="empty">
+        <div class="empty-icon">📊</div>
+        <h2>Ei vielä dataa</h2>
+        <p>Kirjaa vuoroja ja keikkoja, niin tilastot kertyvät tähän automaattisesti.</p>
+      </div>`;
+    return;
+  }
   const maxLead = Math.max(1, ...Object.values(s.byLead));
+  const maxUrg = Math.max(1, ...["A", "B", "C", "D"].map((x) => s.byUrgency[x] || 0));
   app.innerHTML = `
     <header class="page-head"><h1>Tilastot</h1></header>
+
     <div class="kpis">
       ${kpi(s.shiftCount, "vuoroa")}
       ${kpi(s.callCount, "keikkaa")}
-      ${kpi(s.callsPerShift, "keikkaa / vuoro")}
       ${kpi(s.hoursLogged + " h", "kirjattu")}
-      ${kpi(s.transportRate + " %", "kuljetettu")}
-      ${kpi(s.transported, "kuljetusta")}
+    </div>
+
+    <h2 class="block-h">Kuljetus</h2>
+    <div class="ring-wrap">
+      <div class="ring" style="--p:${s.transportRate}"><span>${s.transportRate}%</span></div>
+      <div class="ring-info">
+        <h3>${s.transported} / ${s.callCount} kuljetettu</h3>
+        <p class="muted">${s.callsPerShift} keikkaa / vuoro · ${s.callCount - s.transported} ei kuljetusta</p>
+      </div>
     </div>
 
     <h2 class="block-h">Hälytysasteet</h2>
     <div class="bars">
-      ${["A", "B", "C", "D"].map((k) => bar(k, s.byUrgency[k] || 0, Math.max(1, ...["A", "B", "C", "D"].map((x) => s.byUrgency[x] || 0)), URGENCY[k].color)).join("")}
+      ${["A", "B", "C", "D"].map((k) => bar(k, s.byUrgency[k] || 0, maxUrg, URGENCY[k].color)).join("")}
     </div>
 
     <h2 class="block-h">Johtovastuu</h2>
     <div class="bars">
       ${Object.entries(s.byLead).sort((a, b) => b[1] - a[1]).map(([k, v]) => bar(k, v, maxLead, leadColor(k))).join("") || `<p class="muted">Ei dataa.</p>`}
     </div>
+
+    <h2 class="block-h">Hälytys → kuljetus</h2>
+    ${s.compare.total ? `
+      <div class="kpis">
+        ${kpi(s.compare.changeRate + " %", "kiireellisyys muuttui")}
+        ${kpi(s.compare.urgDown, "laski (B→C)")}
+        ${kpi(s.compare.urgUp, "nousi (C→B)")}
+      </div>
+      <p class="muted" style="margin-top:10px">${s.compare.urgSame}/${s.compare.total} kuljetuksessa kiireellisyys pysyi samana · koodi muuttui ${s.compare.codeChanged} kertaa</p>
+      ${s.compare.topTransitions.length ? `<div class="list compact" style="margin-top:10px">
+        ${s.compare.topTransitions.map(([k, n]) => `<div class="ranked"><span class="cname">${esc(k)}</span><span class="rcount">${n}</span></div>`).join("")}
+      </div>` : ""}
+    ` : `<p class="muted">Ei vielä kuljetuksia, joissa sekä hälytys- että kuljetusaste on kirjattu.</p>`}
 
     <h2 class="block-h">Yleisimmät tehtäväkoodit</h2>
     <div class="list compact">
@@ -665,19 +697,6 @@ function renderStats() {
     <div class="list compact">
       ${s.topDest.length ? s.topDest.map(([d, n]) => `<div class="ranked"><span class="cname">${esc(d)}</span><span class="rcount">${n}</span></div>`).join("") : `<p class="muted">Ei kuljetuksia.</p>`}
     </div>
-
-    <h2 class="block-h">Hälytys → kuljetus</h2>
-    ${s.compare.total ? `
-      <div class="kpis">
-        ${kpi(s.compare.changeRate + " %", "kiireellisyys muuttui")}
-        ${kpi(s.compare.urgDown, "laski (esim. B→C)")}
-        ${kpi(s.compare.urgUp, "nousi (esim. C→B)")}
-      </div>
-      <p class="muted" style="margin-top:8px">${s.compare.urgSame}/${s.compare.total} kuljetuksessa kiireellisyys pysyi samana · koodi muuttui ${s.compare.codeChanged} kertaa</p>
-      ${s.compare.topTransitions.length ? `<div class="list compact" style="margin-top:8px">
-        ${s.compare.topTransitions.map(([k, n]) => `<div class="ranked"><span class="cname">${esc(k)}</span><span class="rcount">${n}</span></div>`).join("")}
-      </div>` : ""}
-    ` : `<p class="muted">Ei vielä kuljetuksia, joissa sekä hälytys- että kuljetusaste on kirjattu.</p>`}
 
     <h2 class="block-h">Merkittävät tapaukset / toimenpiteet</h2>
     <div class="list compact">
@@ -791,8 +810,14 @@ function renderSettings() {
       defaultUnit: val("set-defunit").trim(),
       defaultHt: val("set-defht") === "1",
     });
+    applyAccent();
     toast("Asetukset tallennettu");
   };
+  // Esikatsele teemaväri heti aseman muuttuessa
+  defStationEl.addEventListener("input", () => {
+    const st2 = findStation(defStationEl.value);
+    document.documentElement.style.setProperty("--primary", st2?.color || DEFAULT_ACCENT);
+  });
   document.getElementById("expJson").onclick = () => download("kenttalog-varmuuskopio.json", exportJSON(), "application/json");
   document.getElementById("expCsv").onclick = () => download("kenttalog-keikat.csv", exportCSV(), "text/csv");
   document.getElementById("impBtn").onclick = () => document.getElementById("impFile").click();
@@ -803,6 +828,7 @@ function renderSettings() {
     reader.onload = () => {
       try {
         importJSON(reader.result);
+        applyAccent();
         toast("Varmuuskopio tuotu");
         location.hash = "#/";
         route();
@@ -887,7 +913,29 @@ function toast(msg) {
   setTimeout(() => { t.classList.remove("show"); setTimeout(() => t.remove(), 300); }, 2000);
 }
 
+// ---------- Asemateema ----------
+function applyAccent() {
+  const station = findStation(getSettings().defaultStation);
+  const color = station?.color || DEFAULT_ACCENT;
+  document.documentElement.style.setProperty("--primary", color);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", color);
+  updateStationChip(station);
+}
+function updateStationChip(station) {
+  const chip = document.getElementById("stationChip");
+  if (!chip) return;
+  if (station) {
+    chip.innerHTML = `<span class="sc-dot" style="background:${station.color}"></span>${esc(station.name)} <span class="sc-code">${esc(station.code)}</span>`;
+    chip.classList.add("set");
+  } else {
+    chip.innerHTML = `<span class="sc-dot"></span>Valitse asema`;
+    chip.classList.remove("set");
+  }
+}
+
 // ---------- Käynnistys ----------
+applyAccent();
 window.addEventListener("hashchange", route);
 route();
 
