@@ -6,6 +6,15 @@ import {
 } from "./storage.js";
 import { CODE_GROUPS, CODE_MAP, ALL_CODES, URGENCY } from "./codes.js";
 import { computeStats, shiftHours } from "./stats.js";
+import { STATIONS, stationLabel, ALL_UNITS, findStation } from "./stations.js";
+
+// Datalist-optiot asemille ja yksiköille (yhteiskäyttö lomakkeissa).
+function stationOptions() {
+  return STATIONS.map((s) => `<option value="${esc(stationLabel(s))}">${esc(s.full)}</option>`).join("");
+}
+function unitOptions(units) {
+  return (units || ALL_UNITS).map((u) => `<option value="${esc(u)}">`).join("");
+}
 
 const app = document.getElementById("app");
 const DISPOSITIONS = [
@@ -210,13 +219,12 @@ function openShiftForm(existing) {
       </div>
     </label>
     <label>Yksikkö
-      <input type="text" id="f-unit" list="unitlist" value="${esc(s.unit || "")}" placeholder="esim. EVY161">
-      <datalist id="unitlist">
-        ${settings.units.map((u) => `<option value="${esc(u)}">`).join("")}
-      </datalist>
+      <input type="text" id="f-unit" list="unitlist" value="${esc(s.unit || "")}" placeholder="esim. HE1251">
+      <datalist id="unitlist">${unitOptions(findStation(s.station)?.units)}</datalist>
     </label>
     <label>Asema / tukikohta
-      <input type="text" id="f-station" value="${esc(s.station || "")}" placeholder="esim. Malmi, Töölö">
+      <input type="text" id="f-station" list="stationlist" value="${esc(s.station || "")}" placeholder="esim. Malmi (AS.50)">
+      <datalist id="stationlist">${stationOptions()}</datalist>
     </label>
     <label>Muistiinpanot / oppimispäiväkirja
       <textarea id="f-notes" rows="3" placeholder="Mitä opit tänään?">${esc(s.notes || "")}</textarea>
@@ -269,6 +277,15 @@ function openShiftForm(existing) {
       document.querySelectorAll("#f-ht button").forEach((x) => x.classList.remove("on"));
       b.classList.add("on");
     };
+  });
+  // asema → suodata yksikköehdotukset ja esitäytä yksikkö
+  const stationEl = document.getElementById("f-station");
+  const unitEl = document.getElementById("f-unit");
+  const unitList = document.getElementById("unitlist");
+  stationEl.addEventListener("input", () => {
+    const st = findStation(stationEl.value);
+    unitList.innerHTML = unitOptions(st?.units);
+    if (st && st.units.length && !unitEl.value) unitEl.value = st.units[0];
   });
 }
 
@@ -674,10 +691,12 @@ function renderSettings() {
       <h2>Vuoron oletukset</h2>
       <p class="muted">Esitäytetään automaattisesti uuteen vuoroon.</p>
       <label class="field">Oletusasema
-        <input type="text" id="set-defstation" value="${esc(st.defaultStation || "")}" placeholder="esim. Malmi">
+        <input type="text" id="set-defstation" list="stationlist-set" value="${esc(st.defaultStation || "")}" placeholder="esim. Malmi (AS.50)">
+        <datalist id="stationlist-set">${stationOptions()}</datalist>
       </label>
       <label class="field">Oletusyksikkö
-        <input type="text" id="set-defunit" value="${esc(st.defaultUnit || "")}" placeholder="esim. EVY161">
+        <input type="text" id="set-defunit" list="unitlist-set" value="${esc(st.defaultUnit || "")}" placeholder="esim. HE1251">
+        <datalist id="unitlist-set">${unitOptions()}</datalist>
       </label>
       <label class="field">Oletustaso
         <select id="set-defht">
@@ -706,6 +725,13 @@ function renderSettings() {
 
     <p class="footnote">🔒 Tietosuoja: KenttäLog on henkilökohtainen oppimispäiväkirja. Älä koskaan kirjaa potilaan tunnistetietoja. Tiedot eivät poistu laitteeltasi.</p>
   `;
+  const defStationEl = document.getElementById("set-defstation");
+  defStationEl.addEventListener("input", () => {
+    const station = findStation(defStationEl.value);
+    document.getElementById("unitlist-set").innerHTML = unitOptions(station?.units);
+    const unitEl = document.getElementById("set-defunit");
+    if (station && station.units.length && !unitEl.value) unitEl.value = station.units[0];
+  });
   document.getElementById("saveSettings").onclick = () => {
     updateSettings({
       destinations: splitList(val("set-dest")),
