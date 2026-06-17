@@ -13,6 +13,11 @@ export function computeStats() {
   const byTag = {};
   let transported = 0;
 
+  // Hälytys vs. kuljetus -vertailu
+  const urgRank = { A: 1, B: 2, C: 3, D: 4 };
+  let cmpTotal = 0, urgSame = 0, urgChanged = 0, urgDown = 0, urgUp = 0, codeChanged = 0;
+  const urgTransitions = {};
+
   for (const c of calls) {
     byUrgency[c.urgency || ""] = (byUrgency[c.urgency || ""] || 0) + 1;
     const lead = c.lead || (CODE_MAP.get(c.code)?.lead) || "Muu";
@@ -23,8 +28,24 @@ export function computeStats() {
       transported++;
       const d = c.destination || "Ei kohdetta";
       byDest[d] = (byDest[d] || 0) + 1;
+
+      if (c.transportCode && c.code && c.transportCode !== c.code) codeChanged++;
+      const du = c.urgency, tu = c.transportUrgency;
+      if (du && tu) {
+        cmpTotal++;
+        if (du === tu) {
+          urgSame++;
+        } else {
+          urgChanged++;
+          const key = `${du}→${tu}`;
+          urgTransitions[key] = (urgTransitions[key] || 0) + 1;
+          if (urgRank[tu] > urgRank[du]) urgDown++;       // esim. B→C = kiireellisyys laski
+          else if (urgRank[tu] < urgRank[du]) urgUp++;    // esim. C→B = kiireellisyys nousi
+        }
+      }
     }
   }
+  const topTransitions = Object.entries(urgTransitions).sort((a, b) => b[1] - a[1]);
 
   const topCodes = Object.entries(byCode)
     .sort((a, b) => b[1] - a[1])
@@ -36,6 +57,16 @@ export function computeStats() {
 
   return {
     topTags,
+    compare: {
+      total: cmpTotal,
+      urgSame,
+      urgChanged,
+      urgDown,
+      urgUp,
+      codeChanged,
+      changeRate: cmpTotal ? Math.round((urgChanged / cmpTotal) * 100) : 0,
+      topTransitions,
+    },
     shiftCount: shifts.length,
     callCount: calls.length,
     callsPerShift: shifts.length ? (calls.length / shifts.length).toFixed(1) : "0",

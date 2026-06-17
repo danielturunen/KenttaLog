@@ -666,6 +666,19 @@ function renderStats() {
       ${s.topDest.length ? s.topDest.map(([d, n]) => `<div class="ranked"><span class="cname">${esc(d)}</span><span class="rcount">${n}</span></div>`).join("") : `<p class="muted">Ei kuljetuksia.</p>`}
     </div>
 
+    <h2 class="block-h">Hälytys → kuljetus</h2>
+    ${s.compare.total ? `
+      <div class="kpis">
+        ${kpi(s.compare.changeRate + " %", "kiireellisyys muuttui")}
+        ${kpi(s.compare.urgDown, "laski (esim. B→C)")}
+        ${kpi(s.compare.urgUp, "nousi (esim. C→B)")}
+      </div>
+      <p class="muted" style="margin-top:8px">${s.compare.urgSame}/${s.compare.total} kuljetuksessa kiireellisyys pysyi samana · koodi muuttui ${s.compare.codeChanged} kertaa</p>
+      ${s.compare.topTransitions.length ? `<div class="list compact" style="margin-top:8px">
+        ${s.compare.topTransitions.map(([k, n]) => `<div class="ranked"><span class="cname">${esc(k)}</span><span class="rcount">${n}</span></div>`).join("")}
+      </div>` : ""}
+    ` : `<p class="muted">Ei vielä kuljetuksia, joissa sekä hälytys- että kuljetusaste on kirjattu.</p>`}
+
     <h2 class="block-h">Merkittävät tapaukset / toimenpiteet</h2>
     <div class="list compact">
       ${s.topTags.length ? s.topTags.map(([t, n]) => `<div class="ranked"><span class="cname">${esc(t)}</span><span class="rcount">${n}</span></div>`).join("") : `<p class="muted">Ei merkintöjä vielä.</p>`}
