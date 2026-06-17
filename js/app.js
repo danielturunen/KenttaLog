@@ -2,18 +2,88 @@ import {
   getShifts, getShift, addShift, updateShift, deleteShift,
   addCall, updateCall, deleteCall,
   getSettings, updateSettings,
-  exportJSON, importJSON, exportCSV, clearAll,
+  exportJSON, importJSON, clearAll,
 } from "./storage.js";
 import { CODE_GROUPS, CODE_MAP, ALL_CODES, URGENCY } from "./codes.js";
 import { computeStats, shiftHours } from "./stats.js";
 import { STATIONS, stationLabel, ALL_UNITS, findStation, stationColor, DEFAULT_ACCENT } from "./stations.js";
 
-// Datalist-optiot asemille ja yksiköille (yhteiskäyttö lomakkeissa).
-function stationOptions() {
-  return STATIONS.map((s) => `<option value="${esc(stationLabel(s))}">${esc(s.full)}</option>`).join("");
+// ---------- Lista + oma syöte -valitsimet (asema / yksikkö) ----------
+const CUSTOM = "__custom__";
+
+function stationComboHtml(id, value) {
+  const v = value || "";
+  const inList = STATIONS.some((s) => stationLabel(s) === v);
+  const custom = !!v && !inList;
+  return `
+    <select id="${id}">
+      <option value="">– valitse asema –</option>
+      ${STATIONS.map((s) => `<option value="${esc(stationLabel(s))}" ${v === stationLabel(s) ? "selected" : ""}>${esc(stationLabel(s))}</option>`).join("")}
+      <option value="${CUSTOM}" ${custom ? "selected" : ""}>Muu (kirjoita itse)…</option>
+    </select>
+    <input type="text" id="${id}-custom" placeholder="Kirjoita asema" value="${custom ? esc(v) : ""}" style="${custom ? "" : "display:none"}">
+  `;
 }
-function unitOptions(units) {
-  return (units || ALL_UNITS).map((u) => `<option value="${esc(u)}">`).join("");
+
+function unitOptionList(units, value) {
+  const list = units || ALL_UNITS;
+  const v = value || "";
+  const inList = list.includes(v);
+  const custom = !!v && !inList;
+  return `
+    <option value="">– valitse yksikkö –</option>
+    ${list.map((u) => `<option value="${esc(u)}" ${v === u ? "selected" : ""}>${esc(u)}</option>`).join("")}
+    <option value="${CUSTOM}" ${custom ? "selected" : ""}>Muu (kirjoita itse)…</option>
+  `;
+}
+
+function unitComboHtml(id, value, units) {
+  const v = value || "";
+  const inList = (units || ALL_UNITS).includes(v);
+  const custom = !!v && !inList;
+  return `
+    <select id="${id}">${unitOptionList(units, v)}</select>
+    <input type="text" id="${id}-custom" placeholder="Kirjoita yksikkö" value="${custom ? esc(v) : ""}" style="${custom ? "" : "display:none"}">
+  `;
+}
+
+// Lue valitsimen arvo (lista tai oma syöte).
+function readCombo(id) {
+  const sel = document.getElementById(id);
+  if (!sel) return "";
+  if (sel.value === CUSTOM) return (val(id + "-custom") || "").trim();
+  return sel.value;
+}
+
+// Kytke asema- ja yksikkövalitsin yhteen: oma-syöte näkyviin tarvittaessa,
+// yksikkölista suodattuu aseman mukaan, ja yksikkö esitäyttyy.
+function wireStationUnit(stationId, unitId, { onStationChange } = {}) {
+  const stSel = document.getElementById(stationId);
+  const stCustom = document.getElementById(stationId + "-custom");
+  const unSel = document.getElementById(unitId);
+  const unCustom = document.getElementById(unitId + "-custom");
+
+  function refreshUnitOptions(prefill) {
+    const station = findStation(readCombo(stationId));
+    const current = readCombo(unitId);
+    unSel.innerHTML = unitOptionList(station?.units, current);
+    if (prefill && station && station.units.length && !current) {
+      unSel.value = station.units[0];
+    }
+    unCustom.style.display = unSel.value === CUSTOM ? "" : "none";
+  }
+
+  stSel.onchange = () => {
+    stCustom.style.display = stSel.value === CUSTOM ? "" : "none";
+    if (stSel.value === CUSTOM) stCustom.focus();
+    refreshUnitOptions(true);
+    if (onStationChange) onStationChange(findStation(readCombo(stationId)));
+  };
+  stCustom.oninput = () => { if (onStationChange) onStationChange(findStation(readCombo(stationId))); };
+  unSel.onchange = () => {
+    unCustom.style.display = unSel.value === CUSTOM ? "" : "none";
+    if (unSel.value === CUSTOM) unCustom.focus();
+  };
 }
 
 const app = document.getElementById("app");
@@ -219,13 +289,11 @@ function openShiftForm(existing) {
         <button type="button" data-ht="0" class="${isHt ? "" : "on"}">Perustaso (PT)</button>
       </div>
     </label>
-    <label>Yksikkö
-      <input type="text" id="f-unit" list="unitlist" value="${esc(s.unit || "")}" placeholder="esim. HE1251">
-      <datalist id="unitlist">${unitOptions(findStation(s.station)?.units)}</datalist>
-    </label>
     <label>Asema / tukikohta
-      <input type="text" id="f-station" list="stationlist" value="${esc(s.station || "")}" placeholder="esim. Malmi (AS.50)">
-      <datalist id="stationlist">${stationOptions()}</datalist>
+      ${stationComboHtml("f-station", s.station)}
+    </label>
+    <label>Yksikkö
+      ${unitComboHtml("f-unit", s.unit, findStation(s.station)?.units)}
     </label>
     <label>Muistiinpanot / oppimispäiväkirja
       <textarea id="f-notes" rows="3" placeholder="Mitä opit tänään?">${esc(s.notes || "")}</textarea>
@@ -239,8 +307,8 @@ function openShiftForm(existing) {
         startTime: type === "custom" ? val("f-start") : "",
         endTime: type === "custom" ? val("f-end") : "",
         ht: (document.querySelector("#f-ht .on")?.dataset.ht ?? "1") === "1",
-        unit: val("f-unit"),
-        station: val("f-station"),
+        unit: readCombo("f-unit"),
+        station: readCombo("f-station"),
         notes: val("f-notes"),
       };
       if (existing) updateShift(existing.id, patch);
@@ -279,15 +347,8 @@ function openShiftForm(existing) {
       b.classList.add("on");
     };
   });
-  // asema → suodata yksikköehdotukset ja esitäytä yksikkö
-  const stationEl = document.getElementById("f-station");
-  const unitEl = document.getElementById("f-unit");
-  const unitList = document.getElementById("unitlist");
-  stationEl.addEventListener("input", () => {
-    const st = findStation(stationEl.value);
-    unitList.innerHTML = unitOptions(st?.units);
-    if (st && st.units.length && !unitEl.value) unitEl.value = st.units[0];
-  });
+  // asema → suodata yksikkövalinnat ja esitäytä yksikkö
+  wireStationUnit("f-station", "f-unit");
 }
 
 // ---------- Vuoron tarkka näkymä + keikat ----------
@@ -764,12 +825,10 @@ function renderSettings() {
       <h2>Vuoron oletukset</h2>
       <p class="muted">Esitäytetään automaattisesti uuteen vuoroon.</p>
       <label class="field">Oletusasema
-        <input type="text" id="set-defstation" list="stationlist-set" value="${esc(st.defaultStation || "")}" placeholder="esim. Malmi (AS.50)">
-        <datalist id="stationlist-set">${stationOptions()}</datalist>
+        ${stationComboHtml("set-defstation", st.defaultStation)}
       </label>
       <label class="field">Oletusyksikkö
-        <input type="text" id="set-defunit" list="unitlist-set" value="${esc(st.defaultUnit || "")}" placeholder="esim. HE1251">
-        <datalist id="unitlist-set">${unitOptions()}</datalist>
+        ${unitComboHtml("set-defunit", st.defaultUnit, findStation(st.defaultStation)?.units)}
       </label>
       <label class="field">Oletustaso
         <select id="set-defht">
@@ -782,11 +841,10 @@ function renderSettings() {
 
     <section class="settings-block">
       <h2>Varmuuskopio</h2>
-      <p class="muted">Tiedot tallentuvat vain tähän selaimeen. Ota varmuuskopio säännöllisesti.</p>
+      <p class="muted">Yksi tiedosto sisältää kaiken: vuorot, keikat sekä oletusasema, -yksikkö ja muut asetukset. Tiedot tallentuvat vain tähän selaimeen, joten ota varmuuskopio säännöllisesti.</p>
       <div class="btn-row">
-        <button class="btn" id="expJson">Vie varmuuskopio (JSON)</button>
-        <button class="btn" id="expCsv">Vie keikat (CSV)</button>
-        <button class="btn" id="impBtn">Tuo varmuuskopio</button>
+        <button class="btn primary" id="expJson">⬇︎ Vie varmuuskopio</button>
+        <button class="btn" id="impBtn">⬆︎ Palauta varmuuskopiosta</button>
         <input type="file" id="impFile" accept="application/json" hidden>
       </div>
     </section>
@@ -798,31 +856,24 @@ function renderSettings() {
 
     <p class="footnote">🔒 Tietosuoja: KenttäLog on henkilökohtainen oppimispäiväkirja. Älä koskaan kirjaa potilaan tunnistetietoja. Tiedot eivät poistu laitteeltasi.</p>
   `;
-  const defStationEl = document.getElementById("set-defstation");
-  defStationEl.addEventListener("input", () => {
-    const station = findStation(defStationEl.value);
-    document.getElementById("unitlist-set").innerHTML = unitOptions(station?.units);
-    const unitEl = document.getElementById("set-defunit");
-    if (station && station.units.length && !unitEl.value) unitEl.value = station.units[0];
+  // Asema↔yksikkö-valitsin + teemavärin esikatselu aseman vaihtuessa
+  wireStationUnit("set-defstation", "set-defunit", {
+    onStationChange: (station) => {
+      document.documentElement.style.setProperty("--primary", station?.color || DEFAULT_ACCENT);
+    },
   });
   document.getElementById("saveSettings").onclick = () => {
     updateSettings({
       destinations: splitList(val("set-dest")),
       tags: splitList(val("set-tags")),
-      defaultStation: val("set-defstation").trim(),
-      defaultUnit: val("set-defunit").trim(),
+      defaultStation: readCombo("set-defstation"),
+      defaultUnit: readCombo("set-defunit"),
       defaultHt: val("set-defht") === "1",
     });
     applyAccent();
     toast("Asetukset tallennettu");
   };
-  // Esikatsele teemaväri heti aseman muuttuessa
-  defStationEl.addEventListener("input", () => {
-    const st2 = findStation(defStationEl.value);
-    document.documentElement.style.setProperty("--primary", st2?.color || DEFAULT_ACCENT);
-  });
   document.getElementById("expJson").onclick = () => download("kenttalog-varmuuskopio.json", exportJSON(), "application/json");
-  document.getElementById("expCsv").onclick = () => download("kenttalog-keikat.csv", exportCSV(), "text/csv");
   document.getElementById("impBtn").onclick = () => document.getElementById("impFile").click();
   document.getElementById("impFile").onchange = (e) => {
     const file = e.target.files[0];

@@ -21,7 +21,7 @@ Erillistä palvelinta ei tarvita.
 - **Tilastot** – keikkoja per vuoro, kuljetusprosentti, hälytysastejakauma,
   johtovastuun jakauma, yleisimmät koodit ja kuljetuskohteet, kirjatut tunnit.
 - **Haku & suodatus** kaikista keikoista.
-- **Varmuuskopio** – vienti/tuonti (JSON) ja keikkojen CSV-vienti.
+- **Varmuuskopio** – yksi tiedosto, joka sisältää kaiken (vuorot, keikat ja asetukset kuten oletusasema/-yksikkö); vienti ja palautus.
 - **Tumma teema** – silmäystävällinen erityisesti yövuoroissa.
 
 ## Käyttö
