@@ -22,6 +22,16 @@ export function stationColor(value) {
   return findStation(value)?.color || null;
 }
 
+// Yksikkötunnuksen taso: HE12xx → hoitotaso (true), HE13xx → perustaso (false).
+// Muut → null (ei automaattista päättelyä).
+export function unitLevel(unit) {
+  const m = (unit || "").toUpperCase().match(/HE\s*(\d{2})/);
+  if (!m) return null;
+  if (m[1] === "12") return true;
+  if (m[1] === "13") return false;
+  return null;
+}
+
 // Aseman näyttönimi esim. "Malmi (AS.50)"
 export function stationLabel(s) {
   return `${s.name} (${s.code})`;

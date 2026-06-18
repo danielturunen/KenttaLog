@@ -6,7 +6,7 @@ import {
 } from "./storage.js";
 import { CODE_GROUPS, CODE_MAP, ALL_CODES, URGENCY, PROCEDURES, X_SUBCODES } from "./codes.js";
 import { computeStats, shiftHours } from "./stats.js";
-import { STATIONS, stationLabel, ALL_UNITS, findStation, stationColor, DEFAULT_ACCENT } from "./stations.js";
+import { STATIONS, stationLabel, ALL_UNITS, findStation, stationColor, DEFAULT_ACCENT, unitLevel } from "./stations.js";
 
 // ---------- Lista + oma syöte -valitsimet (asema / yksikkö) ----------
 const CUSTOM = "__custom__";
@@ -57,11 +57,12 @@ function readCombo(id) {
 
 // Kytke asema- ja yksikkövalitsin yhteen: oma-syöte näkyviin tarvittaessa,
 // yksikkölista suodattuu aseman mukaan, ja yksikkö esitäyttyy.
-function wireStationUnit(stationId, unitId, { onStationChange } = {}) {
+function wireStationUnit(stationId, unitId, { onStationChange, onUnitChange } = {}) {
   const stSel = document.getElementById(stationId);
   const stCustom = document.getElementById(stationId + "-custom");
   const unSel = document.getElementById(unitId);
   const unCustom = document.getElementById(unitId + "-custom");
+  const unitChanged = () => { if (onUnitChange) onUnitChange(readCombo(unitId)); };
 
   function refreshUnitOptions(prefill) {
     const station = findStation(readCombo(stationId));
@@ -78,12 +79,15 @@ function wireStationUnit(stationId, unitId, { onStationChange } = {}) {
     if (stSel.value === CUSTOM) stCustom.focus();
     refreshUnitOptions(true);
     if (onStationChange) onStationChange(findStation(readCombo(stationId)));
+    unitChanged();
   };
   stCustom.oninput = () => { if (onStationChange) onStationChange(findStation(readCombo(stationId))); };
   unSel.onchange = () => {
     unCustom.style.display = unSel.value === CUSTOM ? "" : "none";
     if (unSel.value === CUSTOM) unCustom.focus();
+    unitChanged();
   };
+  unCustom.oninput = unitChanged;
 }
 
 const app = document.getElementById("app");
@@ -458,14 +462,16 @@ function openShiftForm(existing) {
     };
   });
   // tasovalinnan logiikka
+  const setHt = (ht) => document.querySelectorAll("#f-ht button").forEach((x) => x.classList.toggle("on", x.dataset.ht === (ht ? "1" : "0")));
   document.querySelectorAll("#f-ht button").forEach((b) => {
-    b.onclick = () => {
-      document.querySelectorAll("#f-ht button").forEach((x) => x.classList.remove("on"));
-      b.classList.add("on");
-    };
+    b.onclick = () => setHt(b.dataset.ht === "1");
   });
-  // asema → suodata yksikkövalinnat ja esitäytä yksikkö
-  wireStationUnit("f-station", "f-unit");
+  // asema → suodata yksikkövalinnat; yksikkö → automaattinen taso (HE12=HT, HE13=PT)
+  wireStationUnit("f-station", "f-unit", {
+    onUnitChange: (unit) => { const lvl = unitLevel(unit); if (lvl !== null) setHt(lvl); },
+  });
+  // uudessa vuorossa esitäytä taso oletusyksikön mukaan
+  if (!existing) { const lvl = unitLevel(readCombo("f-unit")); if (lvl !== null) setHt(lvl); }
 }
 
 // ---------- Vuoron tarkka näkymä + keikat ----------
@@ -1003,6 +1009,10 @@ function renderSettings() {
   wireStationUnit("set-defstation", "set-defunit", {
     onStationChange: (station) => {
       document.documentElement.style.setProperty("--primary", station?.color || DEFAULT_ACCENT);
+    },
+    onUnitChange: (unit) => {
+      const lvl = unitLevel(unit);
+      if (lvl !== null) document.getElementById("set-defht").value = lvl ? "1" : "0";
     },
   });
   document.getElementById("saveSettings").onclick = () => {
