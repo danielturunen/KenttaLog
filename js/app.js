@@ -98,6 +98,8 @@ const DISPOSITIONS = [
   ...X_OUTCOMES,
   "Muu",
 ];
+// Oma rooli toimenpiteissä (valvontataso)
+const ROLES = ["", "Suoritin itse", "Avustin", "Seurasin"];
 
 // X-koodin tarkennevalikon optiot (esim. X-4 -> X-41…X-45).
 function xSubOptions(disposition, selected) {
@@ -192,6 +194,8 @@ function route() {
     case "calls": return renderCalls();
     case "stats": return renderStats();
     case "codes": return renderCodes();
+    case "tools": return renderTools();
+    case "report": return renderReport();
     case "settings": return renderSettings();
     default: return renderHome();
   }
@@ -203,7 +207,7 @@ function parseHash(hash) {
 }
 
 function setActiveTab(path) {
-  const tab = ["shift", "summary"].includes(path) ? "home" : path;
+  const tab = ["shift", "summary"].includes(path) ? "home" : (path === "report" ? "tools" : path);
   document.querySelectorAll(".tabbar a").forEach((a) => {
     a.classList.toggle("active", a.dataset.tab === tab);
   });
@@ -503,10 +507,12 @@ function renderShiftDetail(id) {
     <div class="list">
       ${calls.length === 0 ? `<p class="muted center">Ei vielä keikkoja tällä vuorolla.</p>` : calls.map((c) => callRow(s.id, c)).join("")}
     </div>
+    <button class="fab" id="fabCall" aria-label="Lisää keikka">+</button>
   `;
   document.getElementById("editShift").onclick = () => openShiftForm(s);
   document.getElementById("summaryBtn").onclick = () => { location.hash = `#summary/${s.id}`; };
   document.getElementById("newCall").onclick = () => openCallForm(s.id);
+  document.getElementById("fabCall").onclick = () => openCallForm(s.id);
   app.querySelectorAll("[data-call]").forEach((el) => {
     el.onclick = () => openCallForm(s.id, (s.calls || []).find((c) => c.id === el.dataset.call));
   });
@@ -533,6 +539,7 @@ function callRow(shiftId, c) {
           ${c.destination ? `<span class="meta-pill dest">${esc(c.destination)}</span>` : ""}
           ${c.disposition === "Kuljetettu" && c.transportCode ? `<span class="meta-pill">Kulj. ${esc(c.transportCode)}${c.transportUrgency ? " " + esc(c.transportUrgency) : ""}</span>` : ""}
           ${(c.tags || []).map((t) => `<span class="meta-pill tag">${esc(t)}</span>`).join("")}
+          ${c.role ? `<span class="meta-pill role">${esc(c.role)}</span>` : ""}
         </div>
       </div>
     </div>`;
@@ -600,13 +607,14 @@ function renderShiftSummary(id) {
             if (c.disposition === "Kuljetettu" && c.transportCode) {
               disp += ` (${c.transportCode}${c.transportUrgency ? " " + c.transportUrgency : ""})`;
             }
-            const tags = (c.tags || []).length ? `<div class="pv-rowtags">${(c.tags || []).map(esc).join(", ")}</div>` : "";
+            const tagsLine = (c.tags || []).length ? `<div class="pv-rowtags">${(c.tags || []).map(esc).join(", ")}${c.role ? ` — ${esc(c.role)}` : ""}</div>` : (c.role ? `<div class="pv-rowtags">${esc(c.role)}</div>` : "");
+            const refl = c.reflection ? `<div class="pv-rowrefl">💡 ${esc(c.reflection)}</div>` : "";
             return `<tr>
               <td>${esc(c.time || "")}</td>
               <td>${esc(c.urgency || "")}</td>
               <td>${esc(c.code || "")}</td>
               <td>${esc(c.codeName || "")}</td>
-              <td>${esc(c.description || "")}${tags}</td>
+              <td>${esc(c.description || "")}${tagsLine}${refl}</td>
               <td>${esc(vs)}</td>
               <td>${esc(disp)}</td>
             </tr>`;
@@ -686,6 +694,11 @@ function openCallForm(shiftId, existing) {
       </div>
       <input type="text" id="c-tagextra" placeholder="Muu, lisää pilkulla eroteltuna" value="${esc((c.tags || []).filter((t) => !allTags.includes(t)).join(", "))}">
     </label>
+    <label>Oma rooli toimenpiteissä
+      <div class="seg" id="c-role">
+        ${ROLES.map((r) => `<button type="button" data-r="${esc(r)}" class="${(c.role || "") === r ? "on" : ""}">${esc(r || "–")}</button>`).join("")}
+      </div>
+    </label>
     <label>Peruselintoiminnot (vapaaehtoinen)
       <div class="vitals">
         <span><small>RR</small><input type="text" id="v-rr" inputmode="numeric" value="${esc(c.vitals?.rr || "")}" placeholder="120/80"></span>
@@ -693,6 +706,9 @@ function openCallForm(shiftId, existing) {
         <span><small>SpO₂</small><input type="text" id="v-spo2" inputmode="numeric" value="${esc(c.vitals?.spo2 || "")}" placeholder="98%"></span>
         <span><small>GCS</small><input type="text" id="v-gcs" inputmode="numeric" value="${esc(c.vitals?.gcs || "")}" placeholder="15"></span>
       </div>
+    </label>
+    <label>Reflektio – mitä opin
+      <textarea id="c-reflect" rows="2" placeholder="Lyhyt oppi tästä keikasta">${esc(c.reflection || "")}</textarea>
     </label>
   `, {
     onSave: () => {
@@ -722,6 +738,8 @@ function openCallForm(shiftId, existing) {
         transportCodeName: CODE_MAP.get(transportCode)?.name || "",
         transportUrgency,
         tags: [...new Set([...chipTags, ...extraTags])],
+        role: document.querySelector("#c-role .on")?.dataset.r || "",
+        reflection: val("c-reflect"),
         vitals: hasVitals ? vitals : null,
       };
       if (existing) updateCall(shiftId, existing.id, patch);
@@ -783,6 +801,9 @@ function openCallForm(shiftId, existing) {
   document.querySelectorAll("#c-tags .chip").forEach((b) => {
     b.onclick = () => b.classList.toggle("on");
   });
+  document.querySelectorAll("#c-role button").forEach((b) => {
+    b.onclick = () => document.querySelectorAll("#c-role button").forEach((x) => x.classList.toggle("on", x === b));
+  });
 }
 
 function codeHint(code) {
@@ -792,7 +813,7 @@ function codeHint(code) {
 }
 
 // ---------- Kaikki keikat (haku + suodatus) ----------
-let callFilter = { q: "", urgency: "", lead: "" };
+let callFilter = { q: "", urgency: "", lead: "", incomplete: false };
 function renderCalls() {
   let calls = (function () {
     const out = [];
@@ -800,9 +821,11 @@ function renderCalls() {
     return out;
   })();
   calls.sort((a, b) => (a.shift.date + (a.time || "") < b.shift.date + (b.time || "") ? 1 : -1));
+  const incompleteCount = calls.filter((c) => !c.disposition).length;
 
   const f = callFilter;
   let filtered = calls.filter((c) => {
+    if (f.incomplete && c.disposition) return false;
     if (f.urgency && c.urgency !== f.urgency) return false;
     if (f.lead && (c.lead || CODE_MAP.get(c.code)?.lead) !== f.lead) return false;
     if (f.q) {
@@ -824,6 +847,7 @@ function renderCalls() {
         <option value="">Kaikki johtovastuut</option>
         ${["Ensihoito", "Pelastus", "Poliisi"].map((k) => `<option ${f.lead === k ? "selected" : ""}>${k}</option>`).join("")}
       </select>
+      <button type="button" id="f-incomplete" class="filter-chip ${f.incomplete ? "on" : ""}">Vain kesken${incompleteCount ? ` (${incompleteCount})` : ""}</button>
     </div>
     <p class="muted">${filtered.length} / ${calls.length} keikkaa</p>
     <div class="list">
@@ -842,6 +866,7 @@ function renderCalls() {
   q.oninput = debounce(() => { callFilter.q = q.value; renderCalls(); restoreFocus("q"); }, 200);
   document.getElementById("f-urg").onchange = (e) => { callFilter.urgency = e.target.value; renderCalls(); };
   document.getElementById("f-lead").onchange = (e) => { callFilter.lead = e.target.value; renderCalls(); };
+  document.getElementById("f-incomplete").onclick = () => { callFilter.incomplete = !callFilter.incomplete; renderCalls(); };
 }
 
 // ---------- Tilastot ----------
@@ -867,6 +892,8 @@ function renderStats() {
       ${kpi(s.callCount, "keikkaa")}
       ${kpi(s.hoursLogged + " h", "kirjattu")}
     </div>
+
+    ${goalsSectionHtml(s)}
 
     <h2 class="block-h">Kuljetus</h2>
     <div class="ring-wrap">
@@ -920,6 +947,21 @@ function renderStats() {
 function kpi(value, label) {
   return `<div class="kpi"><div class="kpi-val">${esc(String(value))}</div><div class="kpi-lab">${esc(label)}</div></div>`;
 }
+function goalsSectionHtml(s) {
+  const goals = getSettings().goals || [];
+  if (!goals.length) return "";
+  const rows = goals.map((g) => {
+    const ts = s.tagStats[g.tag] || { total: 0, itse: 0 };
+    const done = ts.total;
+    const pct = Math.min(100, Math.round((done / g.target) * 100));
+    const reached = done >= g.target;
+    return `<div class="goal">
+      <div class="goal-top"><span class="goal-name">${esc(g.tag)}</span><span class="goal-num ${reached ? "done" : ""}">${done} / ${g.target}${ts.itse ? ` · ${ts.itse} itse` : ""}</span></div>
+      <div class="bartrack"><div class="barfill" style="width:${pct}%;background:${reached ? "var(--primary)" : "var(--primary)"}"></div></div>
+    </div>`;
+  }).join("");
+  return `<h2 class="block-h">Osaamistavoitteet</h2><div class="goals">${rows}</div>`;
+}
 function bar(label, value, max, color) {
   const w = Math.round((value / max) * 100);
   return `<div class="barrow"><span class="barlab">${esc(label)}</span><div class="bartrack"><div class="barfill" style="width:${w}%;background:${color}"></div></div><span class="barval">${value}</span></div>`;
@@ -952,6 +994,190 @@ function renderCodes() {
   cq.oninput = debounce(() => { codeQuery = cq.value; renderCodes(); restoreFocus("cq"); }, 200);
 }
 
+// ---------- Työkalut: laskurit + koodivisa ----------
+function renderTools() {
+  app.innerHTML = `
+    <header class="page-head"><h1>Työkalut</h1></header>
+
+    <section class="settings-block">
+      <h2>Jakson raportti</h2>
+      <p class="muted">Koko harjoittelun yhteenveto tulostettavaksi / PDF:ksi ohjaajalle.</p>
+      <a class="btn primary" href="#report">Avaa jakson raportti →</a>
+    </section>
+
+    <section class="settings-block">
+      <h2>GCS-laskuri</h2>
+      <div class="row">
+        <label>Silmät (E)
+          <select id="gcs-e">${[4,3,2,1].map((n)=>`<option value="${n}">${n}</option>`).join("")}</select>
+        </label>
+        <label>Puhe (V)
+          <select id="gcs-v">${[5,4,3,2,1].map((n)=>`<option value="${n}">${n}</option>`).join("")}</select>
+        </label>
+        <label>Liike (M)
+          <select id="gcs-m">${[6,5,4,3,2,1].map((n)=>`<option value="${n}">${n}</option>`).join("")}</select>
+        </label>
+      </div>
+      <div class="calc-out" id="gcs-out">GCS 15</div>
+    </section>
+
+    <section class="settings-block">
+      <h2>Annoslaskuri</h2>
+      <div class="row">
+        <label>Paino (kg)<input type="number" id="d-w" inputmode="decimal" placeholder="80"></label>
+        <label>Annos (mg/kg)<input type="number" id="d-mgkg" inputmode="decimal" placeholder="0.1"></label>
+        <label>Pitoisuus (mg/ml)<input type="number" id="d-conc" inputmode="decimal" placeholder="1"></label>
+      </div>
+      <div class="calc-out" id="d-out">Syötä arvot</div>
+    </section>
+
+    <section class="settings-block">
+      <h2>NEWS2-laskuri</h2>
+      <div class="news-grid">
+        <label>Hengitystaajuus<input type="number" id="n-rr" inputmode="numeric" placeholder="/min"></label>
+        <label>SpO₂ %<input type="number" id="n-spo2" inputmode="numeric" placeholder="%"></label>
+        <label>Lisähappi<select id="n-o2"><option value="0">Ei</option><option value="2">Kyllä</option></select></label>
+        <label>Systolinen RR<input type="number" id="n-sbp" inputmode="numeric" placeholder="mmHg"></label>
+        <label>Pulssi<input type="number" id="n-hr" inputmode="numeric" placeholder="/min"></label>
+        <label>Lämpö °C<input type="number" id="n-temp" inputmode="decimal" placeholder="°C"></label>
+        <label>Tajunta<select id="n-acvpu"><option value="0">Hereillä (A)</option><option value="3">Poikkeava (CVPU)</option></select></label>
+      </div>
+      <div class="calc-out" id="n-out">Syötä arvot</div>
+    </section>
+
+    <section class="settings-block">
+      <h2>Koodivisa</h2>
+      <p class="muted">Harjoittele tehtäväkoodeja: valitse oikea tehtävä koodille.</p>
+      <div id="quiz"></div>
+    </section>
+  `;
+  setupCalculators();
+  startQuiz();
+}
+
+function setupCalculators() {
+  const gcs = () => {
+    const t = +val("gcs-e") + +val("gcs-v") + +val("gcs-m");
+    document.getElementById("gcs-out").textContent = `GCS ${t}`;
+  };
+  ["gcs-e", "gcs-v", "gcs-m"].forEach((id) => document.getElementById(id).onchange = gcs);
+
+  const dose = () => {
+    const w = parseFloat(val("d-w")), mgkg = parseFloat(val("d-mgkg")), conc = parseFloat(val("d-conc"));
+    const out = document.getElementById("d-out");
+    if (!w || !mgkg) { out.textContent = "Syötä arvot"; return; }
+    const mg = w * mgkg;
+    let txt = `${round(mg)} mg`;
+    if (conc > 0) txt += ` = ${round(mg / conc)} ml`;
+    out.textContent = txt;
+  };
+  ["d-w", "d-mgkg", "d-conc"].forEach((id) => document.getElementById(id).oninput = dose);
+
+  const news = () => {
+    const rr = parseFloat(val("n-rr")), spo2 = parseFloat(val("n-spo2")), sbp = parseFloat(val("n-sbp"));
+    const hr = parseFloat(val("n-hr")), temp = parseFloat(val("n-temp"));
+    const o2 = +val("n-o2"), acvpu = +val("n-acvpu");
+    const out = document.getElementById("n-out");
+    if ([rr, spo2, sbp, hr, temp].some((x) => isNaN(x))) { out.textContent = "Syötä kaikki arvot"; return; }
+    let score = o2 + acvpu;
+    score += rr <= 8 ? 3 : rr <= 11 ? 1 : rr <= 20 ? 0 : rr <= 24 ? 2 : 3;
+    score += spo2 >= 96 ? 0 : spo2 >= 94 ? 1 : spo2 >= 92 ? 2 : 3;
+    score += sbp <= 90 ? 3 : sbp <= 100 ? 2 : sbp <= 110 ? 1 : sbp <= 219 ? 0 : 3;
+    score += hr <= 40 ? 3 : hr <= 50 ? 1 : hr <= 90 ? 0 : hr <= 110 ? 1 : hr <= 130 ? 2 : 3;
+    score += temp <= 35 ? 3 : temp <= 36 ? 1 : temp <= 38 ? 0 : temp <= 39 ? 1 : 2;
+    const risk = score >= 7 ? "korkea riski" : score >= 5 ? "keskisuuri riski" : "matala riski";
+    out.textContent = `NEWS2 ${score} – ${risk}`;
+  };
+  ["n-rr", "n-spo2", "n-sbp", "n-hr", "n-temp"].forEach((id) => document.getElementById(id).oninput = news);
+  ["n-o2", "n-acvpu"].forEach((id) => document.getElementById(id).onchange = news);
+}
+
+let quizScore = { ok: 0, total: 0 };
+function startQuiz() {
+  const correct = ALL_CODES[Math.floor(Math.random() * ALL_CODES.length)];
+  const opts = [correct];
+  while (opts.length < 4) {
+    const r = ALL_CODES[Math.floor(Math.random() * ALL_CODES.length)];
+    if (!opts.some((o) => o.code === r.code)) opts.push(r);
+  }
+  opts.sort(() => Math.random() - 0.5);
+  const box = document.getElementById("quiz");
+  if (!box) return;
+  box.innerHTML = `
+    <div class="quiz-q">Mikä tehtävä on koodilla <span class="code">${esc(correct.code)}</span>?</div>
+    <div class="quiz-opts">
+      ${opts.map((o) => `<button type="button" class="btn quiz-opt" data-code="${o.code}">${esc(o.name)}</button>`).join("")}
+    </div>
+    <div class="quiz-score">${quizScore.total ? `Oikein ${quizScore.ok}/${quizScore.total}` : ""}</div>
+  `;
+  box.querySelectorAll(".quiz-opt").forEach((b) => {
+    b.onclick = () => {
+      quizScore.total++;
+      const right = b.dataset.code === correct.code;
+      if (right) quizScore.ok++;
+      box.querySelectorAll(".quiz-opt").forEach((x) => {
+        x.disabled = true;
+        if (x.dataset.code === correct.code) x.classList.add("right");
+        else if (x === b) x.classList.add("wrong");
+      });
+      setTimeout(startQuiz, 850);
+    };
+  });
+}
+
+// ---------- Jakson raportti (tulostettava) ----------
+function renderReport() {
+  const shifts = getShifts();
+  const s = computeStats();
+  const dates = shifts.map((x) => x.date).sort();
+  const range = dates.length ? `${formatDate(dates[0])} – ${formatDate(dates[dates.length - 1])}` : "";
+  const reflections = [];
+  for (const sh of shifts) {
+    for (const c of sh.calls || []) if (c.reflection) reflections.push({ date: sh.date, code: c.code, text: c.reflection });
+    if (sh.notes) reflections.push({ date: sh.date, code: "", text: sh.notes, shift: true });
+  }
+  const goals = getSettings().goals || [];
+  app.innerHTML = `
+    <div class="no-print page-head">
+      <a class="back" href="#tools">‹ Työkalut</a>
+      <button class="btn primary" id="printBtn">🖨️ Tulosta / Tallenna PDF</button>
+    </div>
+    <article class="print-view">
+      <div class="pv-head">
+        <h1>KenttäLog – jakson raportti</h1>
+        <div class="pv-meta">${range ? "Ajalta " + range + " · " : ""}${s.shiftCount} vuoroa · ${s.callCount} keikkaa · ${s.hoursLogged} h</div>
+      </div>
+
+      <div class="pv-stats">
+        <span><b>${s.callCount}</b> keikkaa</span>
+        <span><b>${s.transportRate}%</b> kuljetettu</span>
+        <span>A:${s.byUrgency.A||0} B:${s.byUrgency.B||0} C:${s.byUrgency.C||0} D:${s.byUrgency.D||0}</span>
+      </div>
+
+      ${goals.length ? `<h2>Osaamistavoitteet</h2>
+      <table class="pv-table"><thead><tr><th>Toimenpide</th><th>Tehty</th><th>Itse</th><th>Tavoite</th></tr></thead><tbody>
+        ${goals.map((g) => { const ts = s.tagStats[g.tag] || { total: 0, itse: 0 }; return `<tr><td>${esc(g.tag)}</td><td>${ts.total}</td><td>${ts.itse}</td><td>${g.target}</td></tr>`; }).join("")}
+      </tbody></table>` : ""}
+
+      <h2>Toimenpiteet ja tapaukset</h2>
+      ${s.topTags.length ? `<table class="pv-table"><thead><tr><th>Toimenpide</th><th>Kpl</th></tr></thead><tbody>
+        ${s.topTags.map(([t, n]) => `<tr><td>${esc(t)}</td><td>${n}</td></tr>`).join("")}
+      </tbody></table>` : `<p class="muted">Ei merkintöjä.</p>`}
+
+      <h2>Yleisimmät tehtäväkoodit</h2>
+      ${s.topCodes.length ? `<table class="pv-table"><thead><tr><th>Koodi</th><th>Tehtävä</th><th>Kpl</th></tr></thead><tbody>
+        ${s.topCodes.map((c) => `<tr><td>${esc(c.code)}</td><td>${esc(c.name)}</td><td>${c.n}</td></tr>`).join("")}
+      </tbody></table>` : ""}
+
+      ${reflections.length ? `<h2>Reflektiot ja oppimispäiväkirja</h2>
+        ${reflections.map((r) => `<p class="pv-refl"><b>${formatDate(r.date)}${r.code ? " · " + esc(r.code) : (r.shift ? " · vuoro" : "")}:</b> ${esc(r.text)}</p>`).join("")}` : ""}
+
+      <p class="pv-foot">Henkilökohtainen oppimispäiväkirja. Ei sisällä potilaan tunnistetietoja. Ei virallinen potilasasiakirja.</p>
+    </article>
+  `;
+  document.getElementById("printBtn").onclick = () => window.print();
+}
+
 // ---------- Asetukset ----------
 function renderSettings() {
   const st = getSettings();
@@ -968,6 +1194,12 @@ function renderSettings() {
       <h2>Omat lisätagit</h2>
       <p class="muted">Sovelluksessa on jo ${PROCEDURES.length} sisäänrakennettua edistynyttä toimenpidettä (intubaatio, kardioversio, neulatorakosenteesi…). Lisää tähän vain omat ylimääräiset, pilkulla eroteltuna.</p>
       <textarea id="set-tags" rows="3" placeholder="esim. Oma toimenpide 1, Oma toimenpide 2">${esc(st.tags.join(", "))}</textarea>
+    </section>
+
+    <section class="settings-block">
+      <h2>Osaamistavoitteet</h2>
+      <p class="muted">Yksi per rivi muodossa <b>Toimenpide : määrä</b>. Edistyminen näkyy Tilastot-välilehdellä. Esim. "Intubaatio : 5".</p>
+      <textarea id="set-goals" rows="4" placeholder="Intubaatio : 5&#10;Kardioversio : 3&#10;Synnytys : 1">${esc((st.goals || []).map((g) => `${g.tag} : ${g.target}`).join("\n"))}</textarea>
     </section>
 
     <section class="settings-block">
@@ -1019,6 +1251,7 @@ function renderSettings() {
     updateSettings({
       destinations: splitList(val("set-dest")),
       tags: splitList(val("set-tags")),
+      goals: parseGoals(val("set-goals")),
       defaultStation: readCombo("set-defstation"),
       defaultUnit: readCombo("set-defunit"),
       defaultHt: val("set-defht") === "1",
@@ -1091,6 +1324,16 @@ function localISO(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).pad
 function today() { return localISO(new Date()); }
 function nowTime() { return new Date().toTimeString().slice(0, 5); }
 function splitList(s) { return s.split(",").map((x) => x.trim()).filter(Boolean); }
+function round(n) { return Math.round(n * 100) / 100; }
+function parseGoals(text) {
+  return (text || "").split("\n").map((line) => {
+    const m = line.split(":");
+    if (m.length < 2) return null;
+    const tag = m[0].trim();
+    const target = parseInt(m[1].trim(), 10);
+    return tag && target > 0 ? { tag, target } : null;
+  }).filter(Boolean);
+}
 function formatDate(iso) {
   if (!iso) return "";
   const d = new Date(iso + "T00:00:00");

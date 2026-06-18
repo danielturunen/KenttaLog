@@ -11,6 +11,7 @@ export function computeStats() {
   const byCode = {};
   const byDest = {};
   const byTag = {};
+  const tagStats = {}; // tag -> { total, itse } (rooli "Suoritin itse")
   let transported = 0;
 
   // Hälytys vs. kuljetus -vertailu
@@ -23,7 +24,12 @@ export function computeStats() {
     const lead = c.lead || (CODE_MAP.get(c.code)?.lead) || "Muu";
     byLead[lead] = (byLead[lead] || 0) + 1;
     if (c.code) byCode[c.code] = (byCode[c.code] || 0) + 1;
-    for (const t of c.tags || []) byTag[t] = (byTag[t] || 0) + 1;
+    for (const t of c.tags || []) {
+      byTag[t] = (byTag[t] || 0) + 1;
+      const ts = tagStats[t] || (tagStats[t] = { total: 0, itse: 0 });
+      ts.total++;
+      if (c.role === "Suoritin itse") ts.itse++;
+    }
     if (c.disposition === "Kuljetettu") {
       transported++;
       const d = c.destination || "Ei kohdetta";
@@ -57,6 +63,7 @@ export function computeStats() {
 
   return {
     topTags,
+    tagStats,
     compare: {
       total: cmpTotal,
       urgSame,

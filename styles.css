@@ -334,6 +334,43 @@ a { color: inherit; text-decoration: none; }
 .tabbar a.active .ti { transform: translateY(-1px) scale(1.08); }
 .tabbar a.active::before { content: ""; position: absolute; top: 0; width: 26px; height: 3px; border-radius: 0 0 3px 3px; background: var(--primary); }
 
+/* ---------- FAB ---------- */
+.fab {
+  position: fixed; right: 18px; bottom: calc(var(--tabbar-h) + 16px + env(safe-area-inset-bottom));
+  width: 58px; height: 58px; border-radius: 50%; border: none; z-index: 42;
+  background: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 65%, #000));
+  color: #fff; font-size: 2rem; font-weight: 300; line-height: 1; cursor: pointer;
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--primary) 50%, transparent);
+}
+.fab:active { transform: scale(.93); }
+
+/* ---------- Filter chip & role ---------- */
+.filter-chip { border: 1px solid var(--border); background: var(--surface); color: var(--muted); padding: 11px 14px; border-radius: var(--radius-sm); font-weight: 700; font-size: .9rem; cursor: pointer; }
+.filter-chip.on { background: color-mix(in srgb, #f5b301 22%, var(--surface)); color: #ffd874; border-color: color-mix(in srgb, #f5b301 40%, var(--border)); }
+.meta-pill.role { background: color-mix(in srgb, var(--primary) 22%, var(--surface)); color: color-mix(in srgb, var(--primary) 75%, #fff); }
+
+/* ---------- Goals ---------- */
+.goals { display: flex; flex-direction: column; gap: 12px; }
+.goal { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; box-shadow: var(--shadow); }
+.goal-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px; }
+.goal-name { font-weight: 700; }
+.goal-num { font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.goal-num.done { color: var(--primary); font-weight: 800; }
+
+/* ---------- Calculators & quiz ---------- */
+.calc-out { margin-top: 10px; padding: 12px 14px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--primary) 14%, var(--surface)); border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border)); font-weight: 800; font-size: 1.1rem; }
+.news-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.news-grid label { display: block; font-weight: 700; font-size: .85rem; }
+.news-grid input, .news-grid select { margin-top: 5px; }
+.quiz-q { font-size: 1.05rem; margin-bottom: 12px; }
+.quiz-opts { display: flex; flex-direction: column; gap: 8px; }
+.quiz-opt { text-align: left; }
+.quiz-opt.right { background: var(--primary); color: #fff; border-color: transparent; }
+.quiz-opt.wrong { background: var(--danger); color: #fff; border-color: transparent; }
+.quiz-score { margin-top: 12px; font-weight: 700; color: var(--muted); }
+.pv-rowrefl { color: var(--muted); font-size: .76rem; margin-top: 3px; font-style: italic; }
+.pv-refl { margin: 6px 0; font-size: .9rem; }
+
 /* ---------- Toast ---------- */
 .toast { position: fixed; bottom: calc(var(--tabbar-h) + 16px); left: 50%; transform: translateX(-50%) translateY(20px); background: var(--elevated); color: var(--text); border: 1px solid var(--border); padding: 11px 20px; border-radius: 999px; font-size: .9rem; font-weight: 700; opacity: 0; transition: all .25s; z-index: 60; box-shadow: var(--shadow-lg); }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }

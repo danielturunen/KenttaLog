@@ -26,6 +26,8 @@ const DEFAULT_DATA = {
     // Käyttäjän omat lisätagit. Sisäänrakennetut toimenpiteet (codes.js PROCEDURES)
     // näkyvät aina näiden lisäksi.
     tags: [],
+    // Osaamistavoitteet harjoittelujaksolle: [{ tag, target }]
+    goals: [],
   },
 };
 
