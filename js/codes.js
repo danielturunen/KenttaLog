@@ -119,7 +119,7 @@ export const CODE_GROUPS = [
   },
   {
     id: "pel",
-    label: "Pelastusjohtoiset (2- ja 4-alkuiset)",
+    label: "Pelastusjohtoiset tehtäväluokat ja -koodit",
     lead: "Pelastus",
     color: "#e0563b",
     categories: [
@@ -199,7 +199,7 @@ export const CODE_GROUPS = [
   },
   {
     id: "pol",
-    label: "Poliisijohtoiset (0-alkuiset)",
+    label: "Poliisijohtoiset tehtäväkoodit",
     lead: "Poliisi",
     color: "#2b6cd4",
     categories: [
