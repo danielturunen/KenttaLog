@@ -4,7 +4,7 @@
 export const CODE_GROUPS = [
   {
     id: "eh",
-    label: "Ensihoito (7-alkuiset)",
+    label: "Ensihoidon tehtäväluokat ja -koodit",
     lead: "Ensihoito",
     color: "#1f9d57",
     categories: [
