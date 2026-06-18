@@ -9,6 +9,9 @@ KenttäLog on **selainpohjainen sovellus (PWA)**, joka toimii puhelimella ja
 tietokoneella, myös offline-tilassa, ja jonka voi asentaa kotinäytölle.
 Erillistä palvelinta ei tarvita.
 
+🔗 Sovellus:
+https://danielturunen.github.io/KenttaLog/#/
+
 ## Ominaisuudet
 
 - **Vuorot** – päivä (9–21), yö (21–9) tai vapaa aikaväli, yksikkö/asema ja
