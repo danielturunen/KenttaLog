@@ -2,6 +2,7 @@ import {
   getShifts, getShift, addShift, updateShift, deleteShift,
   addCall, updateCall, deleteCall,
   getSettings, updateSettings,
+  getCodeNote, setCodeNote,
   exportJSON, importJSON, clearAll,
 } from "./storage.js";
 import { CODE_GROUPS, CODE_MAP, ALL_CODES, URGENCY, PROCEDURES, X_SUBCODES } from "./codes.js";
@@ -653,6 +654,7 @@ function openCallForm(shiftId, existing) {
       </datalist>
       <div class="hint" id="c-codehint">${codeHint(c.code)}</div>
       <a class="info-link" id="c-info" href="${infoUrlForCode(c.code)}" target="_blank" rel="noopener">ⓘ Lisätiedot ensihoito-online.fi</a>
+      <div class="code-note" id="c-note">${codeNoteHtml(c.code)}</div>
     </label>
     <p class="form-note">Voit tallentaa pelkän hälytyskoodin nyt ja täydentää loput myöhemmin.</p>
     <label>Kuvaus
@@ -784,7 +786,16 @@ function openCallForm(shiftId, existing) {
     const code = search.value.trim().toUpperCase();
     document.getElementById("c-codehint").innerHTML = codeHint(code);
     document.getElementById("c-info").href = infoUrlForCode(code);
+    document.getElementById("c-note").innerHTML = codeNoteHtml(code);
     if (!tcodeEdited) tcodeEl.value = code;
+  };
+  document.getElementById("c-note").onclick = (e) => {
+    const a = e.target.closest("[data-editnote]");
+    if (!a) return;
+    e.preventDefault();
+    openCodeNote(a.dataset.editnote, () => {
+      document.getElementById("c-note").innerHTML = codeNoteHtml(search.value.trim().toUpperCase());
+    });
   };
   const descEl = document.getElementById("c-desc");
   descEl.addEventListener("input", () => {
@@ -810,6 +821,13 @@ function codeHint(code) {
   const info = CODE_MAP.get((code || "").toUpperCase());
   if (!info) return "";
   return `<span class="lead-tag" style="--lc:${info.color}">${info.lead}</span> ${esc(info.name)} · <span class="muted">${esc(info.category)}</span>`;
+}
+function codeNoteHtml(code) {
+  code = (code || "").toUpperCase();
+  if (!CODE_MAP.get(code)) return "";
+  const note = getCodeNote(code);
+  if (note) return `<div class="cn-show">📝 ${esc(note).replace(/\n/g, "<br>")} <a href="#" data-editnote="${esc(code)}">muokkaa</a></div>`;
+  return `<a href="#" class="cn-add" data-editnote="${esc(code)}">+ Lisää oma muistiinpano tälle koodille</a>`;
 }
 
 // ---------- Kaikki keikat (haku + suodatus) ----------
@@ -984,7 +1002,7 @@ function renderCodes() {
           !q || code.toLowerCase().includes(q) || name.toLowerCase().includes(q) || cat.title.toLowerCase().includes(q));
         if (!codes.length) return "";
         return `<div class="codecat"><h3>${esc(cat.title)}</h3>${codes.map(([code, name]) =>
-          `<a class="coderow" href="${infoUrlForCode(code)}" target="_blank" rel="noopener"><span class="code" style="--lc:${g.color}">${esc(code)}</span><span class="cname">${esc(name)}</span><span class="coderow-go">↗</span></a>`).join("")}</div>`;
+          `<button type="button" class="coderow" data-code="${esc(code)}"><span class="code" style="--lc:${g.color}">${esc(code)}</span><span class="cname">${esc(name)}</span>${getCodeNote(code) ? `<span class="coderow-note">📝</span>` : ""}<span class="coderow-go">›</span></button>`).join("")}</div>`;
       }).join("");
       if (!cats) return "";
       return `<section class="codegroup"><div class="grouphead" style="--lc:${g.color}">${esc(g.label)}</div>${cats}</section>`;
@@ -992,6 +1010,29 @@ function renderCodes() {
   `;
   const cq = document.getElementById("cq");
   cq.oninput = debounce(() => { codeQuery = cq.value; renderCodes(); restoreFocus("cq"); }, 200);
+  app.querySelectorAll("[data-code]").forEach((el) => {
+    el.onclick = () => openCodeNote(el.dataset.code, () => renderCodes());
+  });
+}
+
+// Koodikohtainen muistiinpano + virallinen lähde. Käyttäjän oma teksti, tallentuu laitteelle.
+function openCodeNote(code, after) {
+  const info = CODE_MAP.get(code);
+  const note = getCodeNote(code);
+  openModal(`${code}${info ? " · " + info.name : ""}`, `
+    ${info ? `<p class="muted">${esc(info.lead)} · ${esc(info.category)}</p>` : ""}
+    <a class="info-link" href="${infoUrlForCode(code)}" target="_blank" rel="noopener">ⓘ Avaa virallinen lisätieto (ensihoito-online.fi)</a>
+    <label style="margin-top:12px">Omat muistiinpanot (omin sanoin)
+      <textarea id="cn-text" rows="8" placeholder="Kirjoita omat muistilistasi tästä tehtävästä – omin sanoin.">${esc(note)}</textarea>
+    </label>
+    <p class="form-note">Tallentuu vain tähän laitteeseen. Kirjoita omin sanoin – älä kopioi oppikirjan tekstiä sellaisenaan.</p>
+  `, {
+    onSave: () => {
+      setCodeNote(code, val("cn-text"));
+      closeModal();
+      if (after) after();
+    },
+  });
 }
 
 // Yleisesti opetetut kliiniset muistilistat (ei Ensihoito-oppaasta kopioitua sisältöä).
@@ -1362,8 +1403,9 @@ function openModal(title, bodyHtml, { onSave, extra } = {}) {
   if (extra) wrap.querySelector("#m-extra").onclick = extra.action;
 }
 function closeModal() {
-  document.querySelectorAll(".modal-wrap").forEach((m) => m.remove());
-  document.body.classList.remove("modal-open");
+  const wraps = document.querySelectorAll(".modal-wrap");
+  if (wraps.length) wraps[wraps.length - 1].remove();
+  if (!document.querySelectorAll(".modal-wrap").length) document.body.classList.remove("modal-open");
 }
 
 // ---------- Apufunktiot ----------

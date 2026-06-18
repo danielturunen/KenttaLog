@@ -28,6 +28,8 @@ const DEFAULT_DATA = {
     tags: [],
     // Osaamistavoitteet harjoittelujaksolle: [{ tag, target }]
     goals: [],
+    // Käyttäjän omat muistiinpanot per tehtäväkoodi: { "704": "omin sanoin..." }
+    codeNotes: {},
   },
 };
 
@@ -144,6 +146,19 @@ export function updateSettings(patch) {
   data.settings = { ...data.settings, ...patch };
   save();
   return data.settings;
+}
+
+// ---- Omat koodimuistiinpanot ----
+export function getCodeNote(code) {
+  return load().settings.codeNotes?.[code] || "";
+}
+export function setCodeNote(code, text) {
+  const data = load();
+  if (!data.settings.codeNotes) data.settings.codeNotes = {};
+  const t = (text || "").trim();
+  if (t) data.settings.codeNotes[code] = t;
+  else delete data.settings.codeNotes[code];
+  save();
 }
 
 // ---- Varmuuskopio ----
