@@ -97,19 +97,56 @@ const DISPOSITIONS = [
 ];
 
 // ---------- Lisätietolinkit (ensihoito-online.fi) ----------
-const INFO_BASE = "https://www.ensihoito-online.fi/ensihoidon-tehtavakoodit/";
-// Kategoriakohtaiset suorat sivut (varmistetut). Muut → koodien pääsivu.
+const EHO = "https://www.ensihoito-online.fi/";
+const INFO_BASE = EHO + "ensihoidon-tehtavakoodit/";
+// Tehtäväkoodikohtaiset sivut (varmistetut osoitteet).
+const INFO_CODE = {
+  "700": EHO + "eloton/", "701": EHO + "eloton/",
+  "702": EHO + "702-tajuttomuus/", "703": EHO + "703-hengitysvaikeus/",
+  "704": EHO + "rintakipu/", "705": EHO + "705-rytmihairio/",
+  "706": EHO + "aivoverenkiertohairio/", "714": EHO + "hukkuminen/",
+  "752": EHO + "752-myrkytys/", "754": EHO + "754-palovamma/",
+  "771": EHO + "sokeritasapainon-hairio/", "772": EHO + "kouristelu/",
+  "773": EHO + "yliherkkyysreaktio/", "774": EHO + "774-heikentynyt-yleistila-muu-sairastuminen/",
+};
+// Kategoriakohtaiset sivut koodin alun perusteella.
 const INFO_CATEGORY = [
-  { test: (c) => /^74\d?$/.test(c) || /^2\d\d$/.test(c), url: "https://www.ensihoito-online.fi/vamma-liikenneonnettomuus/" },
+  { test: (c) => /^74\d?$/.test(c) || /^2\d\d$/.test(c), url: EHO + "vamma-liikenneonnettomuus/" },
 ];
 function infoUrlForCode(code) {
   if (!code) return INFO_BASE;
+  if (INFO_CODE[code]) return INFO_CODE[code];
   for (const m of INFO_CATEGORY) if (m.test(code)) return m.url;
   return INFO_BASE;
 }
-// Avainsanavihjeet kuvauksesta: nostavat esiin aiheeseen liittyvän lisätiedon.
+// Avainsanavihjeet: kuvauksesta tunnistetut aiheet nostavat esiin lisätietolinkin.
 const KEYWORD_TIPS = [
-  { kw: ["aivovamma", "kallovamma", "päävamma", "pää vamma", "ptt"], label: "Aivovammapotilas — ensihoito-online.fi", url: "https://www.ensihoito-online.fi/vamma-liikenneonnettomuus/" },
+  // Rytmihäiriöt
+  { kw: ["svt", "supraventrikulaari"], label: "Supraventrikulaarinen takykardia (SVT)", url: EHO + "supraventrikulaarinen-takykardia/" },
+  { kw: ["kammiotakykardia", " vt ", "vt,", "leveäkompleksi"], label: "Kammiotakykardia", url: EHO + "kammiotakykardia/" },
+  { kw: ["kääntyvien kärkien", "torsades"], label: "Kääntyvien kärkien kammiotakykardia", url: EHO + "kaantyvien-karkien-kammiotakykardia/" },
+  { kw: ["eteisvärinä", "flimmeri", "flutteri", "flutter"], label: "Eteisvärinä", url: EHO + "eteisvarina/" },
+  { kw: ["rytmihäiri", "takykardia", "bradykardia", "nopea syke", "tiheälyönti"], label: "Rytmihäiriö", url: EHO + "705-rytmihairio/" },
+  // Sydän & rintakipu
+  { kw: ["stemi", "sydäninfarkti", "infarkti", "rintakipu", "sepelvaltimo", "nstemi"], label: "Rintakipu / sydäninfarkti", url: EHO + "rintakipu/" },
+  // Elvytys
+  { kw: ["elvytys", "eloton", "kammiovärinä", "vf", "rosc", "defibrillaatio"], label: "Eloton / elvytys", url: EHO + "eloton/" },
+  // Hengitys
+  { kw: ["hengitysvaik", "astma", "copd", "keuhkopöhö", "hengenahdistus"], label: "Hengitysvaikeus", url: EHO + "703-hengitysvaikeus/" },
+  // Neurologia
+  { kw: ["aivoinfarkti", "avh", "halvaus", "aivoverenkierto", "tia", "fast"], label: "Aivoverenkiertohäiriö (AVH)", url: EHO + "aivoverenkiertohairio/" },
+  { kw: ["kouristel", "epilept", "status epilepticus"], label: "Kouristelu", url: EHO + "kouristelu/" },
+  { kw: ["tajuttom", "gcs"], label: "Tajuttomuus", url: EHO + "702-tajuttomuus/" },
+  // Aineenvaihdunta
+  { kw: ["hypoglykemia", "matala sokeri", "hypo ", "verensokeri", "diabet", "ketoasidoosi"], label: "Sokeritasapainon häiriö", url: EHO + "sokeritasapainon-hairio/" },
+  // Allergia
+  { kw: ["anafylak", "yliherkkyys", "allerg"], label: "Yliherkkyysreaktio / anafylaksia", url: EHO + "yliherkkyysreaktio/" },
+  // Myrkytys
+  { kw: ["myrkytys", "intoksikaatio", "yliannos", "intox"], label: "Myrkytys", url: EHO + "752-myrkytys/" },
+  // Trauma
+  { kw: ["aivovamma", "kallovamma", "päävamma", "pää vamma", "ptt", "kallonsisä"], label: "Aivovammapotilas", url: EHO + "vamma-liikenneonnettomuus/" },
+  { kw: ["palovamma", "palanut", "savukaasu"], label: "Palovamma", url: EHO + "754-palovamma/" },
+  { kw: ["hukku", "veteen", "upos"], label: "Hukkuminen", url: EHO + "hukkuminen/" },
 ];
 function tipsFor(text) {
   const t = (text || "").toLowerCase();
