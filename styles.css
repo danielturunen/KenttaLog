@@ -239,6 +239,16 @@ a { color: inherit; text-decoration: none; }
 .vitals-line { font-size: .82rem; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
 .head-actions { display: flex; gap: 8px; }
 
+/* Info links & tips */
+.info-link { display: inline-block; margin-top: 8px; font-size: .85rem; font-weight: 700; color: var(--primary); }
+.form-note { font-size: .82rem; color: var(--muted); background: var(--surface-2); border-radius: 9px; padding: 8px 11px; margin: 0 0 13px; }
+.tips { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.tip { display: inline-block; font-size: .85rem; font-weight: 700; color: #ffd874; background: color-mix(in srgb, #f5b301 18%, var(--surface)); border: 1px solid color-mix(in srgb, #f5b301 35%, var(--border)); padding: 8px 11px; border-radius: 9px; }
+.meta-pill.kesken { background: color-mix(in srgb, #f5b301 24%, var(--surface)); color: #ffd874; }
+.info-banner { display: block; margin-bottom: 14px; padding: 12px 15px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--primary) 14%, var(--surface)); border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--border)); color: var(--primary); font-weight: 700; font-size: .9rem; }
+.coderow { align-items: center; }
+.coderow-go { margin-left: auto; color: var(--muted); font-weight: 700; }
+
 /* ---------- Calendar ---------- */
 .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .cal-head .iconbtn { font-size: 1.7rem; }

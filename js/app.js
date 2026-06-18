@@ -96,6 +96,38 @@ const DISPOSITIONS = [
   "Muu",
 ];
 
+// ---------- Lisätietolinkit (ensihoito-online.fi) ----------
+const INFO_BASE = "https://www.ensihoito-online.fi/ensihoidon-tehtavakoodit/";
+// Kategoriakohtaiset suorat sivut (varmistetut). Muut → koodien pääsivu.
+const INFO_CATEGORY = [
+  { test: (c) => /^74\d?$/.test(c) || /^2\d\d$/.test(c), url: "https://www.ensihoito-online.fi/vamma-liikenneonnettomuus/" },
+];
+function infoUrlForCode(code) {
+  if (!code) return INFO_BASE;
+  for (const m of INFO_CATEGORY) if (m.test(code)) return m.url;
+  return INFO_BASE;
+}
+// Avainsanavihjeet kuvauksesta: nostavat esiin aiheeseen liittyvän lisätiedon.
+const KEYWORD_TIPS = [
+  { kw: ["aivovamma", "kallovamma", "päävamma", "pää vamma", "ptt"], label: "Aivovammapotilas — ensihoito-online.fi", url: "https://www.ensihoito-online.fi/vamma-liikenneonnettomuus/" },
+];
+function tipsFor(text) {
+  const t = (text || "").toLowerCase();
+  return KEYWORD_TIPS.filter((tip) => tip.kw.some((k) => t.includes(k)));
+}
+function tipsHtml(tips) {
+  return tips.map((tip) => `<a class="tip" href="${tip.url}" target="_blank" rel="noopener">💡 ${esc(tip.label)}</a>`).join("");
+}
+// Lyhyt lopputulosmerkintä (X-koodille tarkenne mukaan, esim. X-51).
+function dispositionShort(c) {
+  if (!c.disposition) return "Kesken";
+  if (c.disposition.startsWith("X-")) {
+    const base = c.disposition.split(" ")[0];
+    return base + (c.xDetail || "");
+  }
+  return c.disposition;
+}
+
 // ---------- Reititys ----------
 function route() {
   const hash = location.hash.slice(1) || "/";
@@ -406,7 +438,7 @@ function callRow(shiftId, c) {
         ${c.description ? `<div class="call-desc">${esc(c.description)}</div>` : ""}
         ${vitalsLine(c.vitals)}
         <div class="call-meta">
-          ${c.disposition ? `<span class="meta-pill">${esc(c.disposition)}</span>` : ""}
+          ${c.disposition ? `<span class="meta-pill">${esc(dispositionShort(c))}</span>` : `<span class="meta-pill kesken">Kesken</span>`}
           ${c.destination ? `<span class="meta-pill dest">${esc(c.destination)}</span>` : ""}
           ${c.disposition === "Kuljetettu" && c.transportCode ? `<span class="meta-pill">Kulj. ${esc(c.transportCode)}${c.transportUrgency ? " " + esc(c.transportUrgency) : ""}</span>` : ""}
           ${(c.tags || []).map((t) => `<span class="meta-pill tag">${esc(t)}</span>`).join("")}
@@ -473,7 +505,7 @@ function renderShiftSummary(id) {
           ${calls.length ? calls.map((c) => {
             const v = c.vitals;
             const vs = v ? [v.rr && "RR " + v.rr, v.hr && "P " + v.hr, v.spo2 && "SpO₂ " + v.spo2, v.gcs && "GCS " + v.gcs].filter(Boolean).join(", ") : "";
-            let disp = [c.disposition, c.destination].filter(Boolean).join(": ");
+            let disp = c.disposition ? [dispositionShort(c), c.destination].filter(Boolean).join(": ") : "Kesken";
             if (c.disposition === "Kuljetettu" && c.transportCode) {
               disp += ` (${c.transportCode}${c.transportUrgency ? " " + c.transportUrgency : ""})`;
             }
@@ -502,9 +534,10 @@ function renderShiftSummary(id) {
 // ---------- Keikan lisäys / muokkaus ----------
 function openCallForm(shiftId, existing) {
   const settings = getSettings();
-  const c = existing || { time: nowTime(), urgency: "C", disposition: "Kuljetettu" };
+  const c = existing || { time: nowTime(), urgency: "", disposition: "" };
   // Sisäänrakennetut toimenpiteet + käyttäjän omat tagit
   const allTags = [...new Set([...PROCEDURES, ...(settings.tags || [])])];
+  const isX = (c.disposition || "").startsWith("X-");
   openModal(existing ? "Muokkaa keikkaa" : "Uusi keikka", `
     <div class="row">
       <label>Kellonaika<input type="time" id="c-time" value="${esc(c.time || "")}"></label>
@@ -514,21 +547,30 @@ function openCallForm(shiftId, existing) {
         </div>
       </label>
     </div>
-    <label>Tehtäväkoodi
+    <label>Tehtäväkoodi (hälytyskoodi)
       <input type="text" id="c-codesearch" list="codelist" value="${esc(c.code || "")}" placeholder="Hae numerolla tai sanalla, esim. 704 tai rintakipu" autocomplete="off">
       <datalist id="codelist">
         ${ALL_CODES.map((x) => `<option value="${x.code}">${x.code} – ${esc(x.name)} (${x.lead})</option>`).join("")}
       </datalist>
       <div class="hint" id="c-codehint">${codeHint(c.code)}</div>
+      <a class="info-link" id="c-info" href="${infoUrlForCode(c.code)}" target="_blank" rel="noopener">ⓘ Lisätiedot ensihoito-online.fi</a>
     </label>
+    <p class="form-note">Voit tallentaa pelkän hälytyskoodin nyt ja täydentää loput myöhemmin.</p>
     <label>Kuvaus
       <textarea id="c-desc" rows="3" placeholder="Lyhyt kuvaus keikasta (ei tunnistetietoja)">${esc(c.description || "")}</textarea>
+      <div class="tips" id="c-tips">${tipsHtml(tipsFor(c.description))}</div>
     </label>
     <label>Lopputulos / kuljetus
       <select id="c-disp">
+        <option value="" ${!c.disposition ? "selected" : ""}>— Kesken (täydennä myöhemmin)</option>
         ${DISPOSITIONS.map((d) => `<option ${c.disposition === d ? "selected" : ""}>${esc(d)}</option>`).join("")}
       </select>
     </label>
+    <div id="c-xwrap" style="${isX ? "" : "display:none"}">
+      <label>Tarkenne (valinnainen)
+        <input type="text" id="c-xdetail" inputmode="numeric" value="${esc(c.xDetail || "")}" placeholder="esim. 1 → ${esc((c.disposition || "X-5").split(" ")[0])}1">
+      </label>
+    </div>
     <div id="c-destwrap" style="${c.disposition === "Kuljetettu" ? "" : "display:none"}">
       <label>Kuljetuskohde
         <input type="text" id="c-dest" list="destlist" value="${esc(c.destination || "")}" placeholder="esim. Meilahti">
@@ -571,6 +613,7 @@ function openCallForm(shiftId, existing) {
       const hasVitals = Object.values(vitals).some((v) => v.trim());
       const disposition = val("c-disp");
       const transported = disposition === "Kuljetettu";
+      const xDetail = disposition.startsWith("X-") ? val("c-xdetail").trim() : "";
       // Kuljetuskoodi/-kiireellisyys: oletus = hälytyskoodi/-aste (millä HäKe hälytti)
       const transportCode = transported ? (val("c-tcode").trim().toUpperCase() || code) : "";
       const transportUrgency = transported ? (document.querySelector("#c-turg .on")?.dataset.u || urgency) : "";
@@ -582,6 +625,7 @@ function openCallForm(shiftId, existing) {
         lead: CODE_MAP.get(code)?.lead || "",
         description: val("c-desc"),
         disposition,
+        xDetail,
         destination: transported ? val("c-dest") : "",
         transportCode,
         transportCodeName: CODE_MAP.get(transportCode)?.name || "",
@@ -628,11 +672,23 @@ function openCallForm(shiftId, existing) {
   });
   const search = document.getElementById("c-codesearch");
   search.oninput = () => {
-    document.getElementById("c-codehint").innerHTML = codeHint(search.value.trim().toUpperCase());
-    if (!tcodeEdited) tcodeEl.value = search.value.trim().toUpperCase();
+    const code = search.value.trim().toUpperCase();
+    document.getElementById("c-codehint").innerHTML = codeHint(code);
+    document.getElementById("c-info").href = infoUrlForCode(code);
+    if (!tcodeEdited) tcodeEl.value = code;
   };
+  const descEl = document.getElementById("c-desc");
+  descEl.addEventListener("input", () => {
+    document.getElementById("c-tips").innerHTML = tipsHtml(tipsFor(descEl.value));
+  });
   document.getElementById("c-disp").onchange = (e) => {
-    document.getElementById("c-destwrap").style.display = e.target.value === "Kuljetettu" ? "" : "none";
+    const v = e.target.value;
+    document.getElementById("c-destwrap").style.display = v === "Kuljetettu" ? "" : "none";
+    const xwrap = document.getElementById("c-xwrap");
+    xwrap.style.display = v.startsWith("X-") ? "" : "none";
+    if (v.startsWith("X-")) {
+      document.getElementById("c-xdetail").placeholder = `esim. 1 → ${v.split(" ")[0]}1`;
+    }
   };
   document.querySelectorAll("#c-tags .chip").forEach((b) => {
     b.onclick = () => b.classList.toggle("on");
@@ -686,7 +742,7 @@ function renderCalls() {
           <div class="call-left">${c.urgency ? `<span class="urg" style="background:${URGENCY[c.urgency].color}">${c.urgency}</span>` : `<span class="urg none">–</span>`}</div>
           <div class="call-body">
             <div class="call-title"><span class="code">${esc(c.code || "?")}</span><span class="cname">${esc(c.codeName || "")}</span></div>
-            <div class="call-meta"><span class="muted">${formatDate(c.shift.date)} ${esc(c.time || "")}</span>${c.disposition ? ` · <span class="meta-pill">${esc(c.disposition)}</span>` : ""}${c.destination ? ` <span class="meta-pill dest">${esc(c.destination)}</span>` : ""}</div>
+            <div class="call-meta"><span class="muted">${formatDate(c.shift.date)} ${esc(c.time || "")}</span> · ${c.disposition ? `<span class="meta-pill">${esc(dispositionShort(c))}</span>` : `<span class="meta-pill kesken">Kesken</span>`}${c.destination ? ` <span class="meta-pill dest">${esc(c.destination)}</span>` : ""}</div>
             ${c.description ? `<div class="call-desc">${esc(c.description)}</div>` : ""}
           </div>
         </a>`).join("")}
@@ -789,13 +845,14 @@ function renderCodes() {
   app.innerHTML = `
     <header class="page-head"><h1>Tehtäväkoodit</h1></header>
     <input type="search" id="cq" class="search" placeholder="Hae koodi tai tehtävä…" value="${esc(codeQuery)}">
+    <a class="info-banner" href="${INFO_BASE}" target="_blank" rel="noopener">ⓘ Avaa koodien lisätiedot ensihoito-online.fi:ssä →</a>
     ${CODE_GROUPS.map((g) => {
       const cats = g.categories.map((cat) => {
         const codes = cat.codes.filter(([code, name]) =>
           !q || code.toLowerCase().includes(q) || name.toLowerCase().includes(q) || cat.title.toLowerCase().includes(q));
         if (!codes.length) return "";
         return `<div class="codecat"><h3>${esc(cat.title)}</h3>${codes.map(([code, name]) =>
-          `<div class="coderow"><span class="code" style="--lc:${g.color}">${esc(code)}</span><span class="cname">${esc(name)}</span></div>`).join("")}</div>`;
+          `<a class="coderow" href="${infoUrlForCode(code)}" target="_blank" rel="noopener"><span class="code" style="--lc:${g.color}">${esc(code)}</span><span class="cname">${esc(name)}</span><span class="coderow-go">↗</span></a>`).join("")}</div>`;
       }).join("");
       if (!cats) return "";
       return `<section class="codegroup"><div class="grouphead" style="--lc:${g.color}">${esc(g.label)}</div>${cats}</section>`;
