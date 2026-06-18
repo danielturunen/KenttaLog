@@ -234,7 +234,7 @@ function renderHome() {
   });
   const body = document.getElementById("home-body");
   if (homeView === "calendar") body.innerHTML = calendarHtml(shifts);
-  else body.innerHTML = `<div class="list">${orderedShifts(shifts).map(shiftCard).join("")}</div>`;
+  else body.innerHTML = shiftGroupsHtml(shifts);
 
   if (homeView === "calendar") {
     document.getElementById("cal-prev").onclick = () => { calCursor.setMonth(calCursor.getMonth() - 1); renderHome(); };
@@ -314,15 +314,33 @@ function shiftCategory(s, now = new Date()) {
   return 2;
 }
 
-// Tänään ensin, sitten tulevat (lähin ensin), lopuksi menneet (uusin ensin).
-function orderedShifts(shifts) {
+function shiftStartMin(s) {
+  const t = s.startTime || (s.type === "night" ? "21:00" : "09:00");
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+function shiftTypeName(s) {
+  return s.type === "day" ? "Päivävuoro" : s.type === "night" ? "Yövuoro" : "Vuoro";
+}
+
+// Ryhmittely: nykyinen + tulevat ylhäällä (aikajärjestyksessä), menneet erikseen alla.
+function shiftGroupsHtml(shifts) {
   const now = new Date();
-  return shifts.slice().sort((a, b) => {
-    const ca = shiftCategory(a, now), cb = shiftCategory(b, now);
-    if (ca !== cb) return ca - cb;
-    if (ca === 1) return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; // tulevat nousevasti
-    return a.date < b.date ? 1 : a.date > b.date ? -1 : 0;               // tänään/menneet laskevasti
-  });
+  const active = [], past = [];
+  for (const s of shifts) (shiftCategory(s, now) === 2 ? past : active).push(s);
+  const byDateAsc = (a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : shiftStartMin(a) - shiftStartMin(b));
+  active.sort(byDateAsc);
+  past.sort((a, b) => -byDateAsc(a, b)); // menneet: uusin ensin
+
+  const block = (s, isPast) =>
+    `<div class="shift-block${isPast ? " past" : ""}"><div class="shift-date">${formatDateLong(s.date)}</div>${shiftCard(s)}</div>`;
+
+  let html = `<div class="list">${active.map((s) => block(s, false)).join("")}</div>`;
+  if (past.length) {
+    html += `<div class="group-div">Menneet vuorot</div>`;
+    html += `<div class="list">${past.map((s) => block(s, true)).join("")}</div>`;
+  }
+  return html;
 }
 
 function shiftCard(s) {
@@ -343,7 +361,7 @@ function shiftCard(s) {
   return `
     <a class="card shift-card${today ? " is-today" : ""}" href="#shift/${s.id}" style="--sc:${accent}">
       <div class="card-top">
-        <div class="date">${formatDate(s.date)}</div>
+        <div class="date">${shiftTypeName(s)}</div>
         <span class="pills">${today}${level}${tag}</span>
       </div>
       ${sub ? `<div class="muted card-sub">${sub}</div>` : ""}
@@ -1067,6 +1085,12 @@ function formatDate(iso) {
   if (!iso) return "";
   const d = new Date(iso + "T00:00:00");
   const days = ["su", "ma", "ti", "ke", "to", "pe", "la"];
+  return `${days[d.getDay()]} ${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
+}
+function formatDateLong(iso) {
+  if (!iso) return "";
+  const d = new Date(iso + "T00:00:00");
+  const days = ["Sunnuntai", "Maanantai", "Tiistai", "Keskiviikko", "Torstai", "Perjantai", "Lauantai"];
   return `${days[d.getDay()]} ${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
 }
 function debounce(fn, ms) {
