@@ -251,6 +251,65 @@ export const URGENCY = {
   D: { label: "D", desc: "Kiireetön", color: "#2f9e44" },
 };
 
+// X-koodien tarkenteet (alakoodit). Lähde: käyttäjän toimittama virallinen lista.
+export const X_SUBCODES = {
+  "X-0": [
+    ["X-01", "Tekninen este"],
+    ["X-02", "Sääeste"],
+    ["X-03", "Ei helikopteria käytettävissä"],
+    ["X-04", "Ei soveltuvaa laskupaikkaa helikopterille"],
+    ["X-05", "Tehtävä maayksikölle"],
+    ["X-06", "Lentohenkilöstön työajan ylitys"],
+  ],
+  "X-1": [
+    ["X-11", "Potilas menehtynyt, ei aktiivisia hoitotoimia"],
+    ["X-12", "Potilas menehtynyt hoitotoimista huolimatta"],
+  ],
+  "X-2": [
+    ["X-21", "Terveydentila määritetty, ohjattu poliisin suojaan"],
+  ],
+  "X-3": [
+    ["X-31", "Pyydetty kohteeseen muuta apua"],
+  ],
+  "X-4": [
+    ["X-41", "Kuljetus toisella ensihoitoyksiköllä"],
+    ["X-42", "Kuljetus toisella ensihoitoyksiköllä, ensihoitaja tai kenttäjohtaja saattaa"],
+    ["X-43", "Kuljetus toisella ensihoitoyksiköllä, ensihoitolääkäri saattaa"],
+    ["X-44", "Ohjataan jatkohoitoon muulla kyydillä"],
+    ["X-45", "Hoidon tarpeen arviointi tehty etänä, ohjataan hoitoon muulla kyydillä"],
+  ],
+  "X-5": [
+    ["X-51", "Ei tarvetta, terveydentila määritetty"],
+  ],
+  "X-6": [
+    ["X-61", "Potilas kieltäytyi hoitotoimista ja kuljetuksesta"],
+    ["X-62", "Potilas kieltäytyi kuljetuksesta"],
+  ],
+  "X-7": [
+    ["X-71", "Ei potilasta tai potilasta ei löydy"],
+  ],
+  "X-8": [
+    ["X-81", "Potilas hoidettu kohteessa pysyväisohjeeseen tai lääkärin konsultaatioon perustuen"],
+    ["X-82", "Potilas hoidettu kohteessa"],
+  ],
+  "X-9": [
+    ["X-91", "Tehtävän peruutus hätäkeskuksen antaman lisätiedon perusteella"],
+    ["X-92", "Tehtävän peruutus muun lisätiedon perusteella"],
+    ["X-93", "Tehtävän peruutus kohteessa olevan yksikön toimesta"],
+    ["X-94", "Tehtävän peruutus ensihoidon kenttäjohdon / tilannekeskuksen toimesta"],
+    ["X-95", "Ei lääkäriyksikön tarvetta"],
+    ["X-96", "Tehtävä ohjattu paremmin soveltuvalle lääkäriyksikölle"],
+    ["X-97", "Tehtävän peruutus sijainnin vuoksi"],
+  ],
+};
+
+// Tarkenne (esim. "X-41") -> kuvaus.
+export const X_SUB_MAP = (() => {
+  const m = new Map();
+  for (const subs of Object.values(X_SUBCODES)) for (const [code, name] of subs) m.set(code, name);
+  return m;
+})();
+
 // Edistyneet / huomionarvoiset toimenpiteet ja tilanteet, joita voi merkitä keikkaan.
 // EI perusasioita (EKG, i.v.-yhteys, monitorointi, vitaalit, auskultaatio, happihoito).
 // Lähteet: ensihoito-online.fi, ehinfo.fi, Duodecim (ks. README).

@@ -4,7 +4,7 @@ import {
   getSettings, updateSettings,
   exportJSON, importJSON, clearAll,
 } from "./storage.js";
-import { CODE_GROUPS, CODE_MAP, ALL_CODES, URGENCY, PROCEDURES } from "./codes.js";
+import { CODE_GROUPS, CODE_MAP, ALL_CODES, URGENCY, PROCEDURES, X_SUBCODES } from "./codes.js";
 import { computeStats, shiftHours } from "./stats.js";
 import { STATIONS, stationLabel, ALL_UNITS, findStation, stationColor, DEFAULT_ACCENT } from "./stations.js";
 
@@ -91,10 +91,18 @@ const X_OUTCOMES = CODE_GROUPS.find((g) => g.id === "x").categories[0].codes
   .map(([code, name]) => `${code} – ${name}`);
 const DISPOSITIONS = [
   "Kuljetettu",
-  "Ohjattu omalla kyydillä",
   ...X_OUTCOMES,
   "Muu",
 ];
+
+// X-koodin tarkennevalikon optiot (esim. X-4 -> X-41…X-45).
+function xSubOptions(disposition, selected) {
+  const base = (disposition || "").split(" ")[0];
+  const subs = X_SUBCODES[base];
+  if (!subs) return "";
+  return `<option value="">— valitse tarkenne —</option>` +
+    subs.map(([code, name]) => `<option value="${code}" ${selected === code ? "selected" : ""}>${esc(code)} ${esc(name)}</option>`).join("");
+}
 
 // ---------- Lisätietolinkit (ensihoito-online.fi) ----------
 const EHO = "https://www.ensihoito-online.fi/";
@@ -159,8 +167,7 @@ function tipsHtml(tips) {
 function dispositionShort(c) {
   if (!c.disposition) return "Kesken";
   if (c.disposition.startsWith("X-")) {
-    const base = c.disposition.split(" ")[0];
-    return base + (c.xDetail || "");
+    return c.xSub || c.disposition.split(" ")[0];
   }
   return c.disposition;
 }
@@ -604,8 +611,8 @@ function openCallForm(shiftId, existing) {
       </select>
     </label>
     <div id="c-xwrap" style="${isX ? "" : "display:none"}">
-      <label>Tarkenne (valinnainen)
-        <input type="text" id="c-xdetail" inputmode="numeric" value="${esc(c.xDetail || "")}" placeholder="esim. 1 → ${esc((c.disposition || "X-5").split(" ")[0])}1">
+      <label>Tarkenne
+        <select id="c-xsub">${isX ? xSubOptions(c.disposition, c.xSub) : ""}</select>
       </label>
     </div>
     <div id="c-destwrap" style="${c.disposition === "Kuljetettu" ? "" : "display:none"}">
@@ -650,7 +657,7 @@ function openCallForm(shiftId, existing) {
       const hasVitals = Object.values(vitals).some((v) => v.trim());
       const disposition = val("c-disp");
       const transported = disposition === "Kuljetettu";
-      const xDetail = disposition.startsWith("X-") ? val("c-xdetail").trim() : "";
+      const xSub = disposition.startsWith("X-") ? val("c-xsub") : "";
       // Kuljetuskoodi/-kiireellisyys: oletus = hälytyskoodi/-aste (millä HäKe hälytti)
       const transportCode = transported ? (val("c-tcode").trim().toUpperCase() || code) : "";
       const transportUrgency = transported ? (document.querySelector("#c-turg .on")?.dataset.u || urgency) : "";
@@ -662,7 +669,7 @@ function openCallForm(shiftId, existing) {
         lead: CODE_MAP.get(code)?.lead || "",
         description: val("c-desc"),
         disposition,
-        xDetail,
+        xSub,
         destination: transported ? val("c-dest") : "",
         transportCode,
         transportCodeName: CODE_MAP.get(transportCode)?.name || "",
@@ -722,10 +729,9 @@ function openCallForm(shiftId, existing) {
     const v = e.target.value;
     document.getElementById("c-destwrap").style.display = v === "Kuljetettu" ? "" : "none";
     const xwrap = document.getElementById("c-xwrap");
-    xwrap.style.display = v.startsWith("X-") ? "" : "none";
-    if (v.startsWith("X-")) {
-      document.getElementById("c-xdetail").placeholder = `esim. 1 → ${v.split(" ")[0]}1`;
-    }
+    const isXnow = v.startsWith("X-");
+    xwrap.style.display = isXnow ? "" : "none";
+    if (isXnow) document.getElementById("c-xsub").innerHTML = xSubOptions(v, "");
   };
   document.querySelectorAll("#c-tags .chip").forEach((b) => {
     b.onclick = () => b.classList.toggle("on");
