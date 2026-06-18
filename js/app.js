@@ -104,7 +104,7 @@ const DISPOSITIONS = [
 const ROLES = ["", "Suoritin itse", "Avustin", "Seurasin"];
 
 // Meilahden teho-osaston moduulit (valitaan, kun kohde on teho-osasto)
-const TEHO_MODULES = ["Moduulit AB", "Moduulit C", "ED"];
+const TEHO_MODULES = ["Moduuli AB", "Moduuli C", "Moduuli ED"];
 // Onko kuljetuskohde Meilahden teho-osasto?
 function isTeho(dest) {
   return /teho/i.test(dest || "");
@@ -527,11 +527,19 @@ function renderShiftDetail(id) {
   });
 }
 
+// Tehtävän "teema-aste": jos tehtävällä on lopputulos kuljetuskoodilla/-asteella,
+// käytä kuljetuksen (lopputuloksen) hälytysastetta; muuten alkuperäistä hälytyskoodin astetta.
+function effectiveUrgency(c) {
+  if (c.disposition === "Kuljetettu" && c.transportUrgency) return c.transportUrgency;
+  return c.urgency || "";
+}
+
 function callRow(shiftId, c) {
-  const u = URGENCY[c.urgency];
+  const eu = effectiveUrgency(c);
+  const u = URGENCY[eu];
   const info = CODE_MAP.get(c.code);
   return `
-    <div class="call" data-call="${c.id}">
+    <div class="call" data-call="${c.id}" style="${u ? `--uc:${u.color}` : ""}">
       <div class="call-left">
         ${u ? `<span class="urg" style="background:${u.color}">${u.label}</span>` : `<span class="urg none">–</span>`}
       </div>
@@ -893,15 +901,15 @@ function renderCalls() {
     </div>
     <p class="muted">${filtered.length} / ${calls.length} keikkaa</p>
     <div class="list">
-      ${filtered.length === 0 ? `<p class="muted center">Ei osumia.</p>` : filtered.map((c) => `
-        <a class="call linkrow" href="#shift/${c.shift.id}">
-          <div class="call-left">${c.urgency ? `<span class="urg" style="background:${URGENCY[c.urgency].color}">${c.urgency}</span>` : `<span class="urg none">–</span>`}</div>
+      ${filtered.length === 0 ? `<p class="muted center">Ei osumia.</p>` : filtered.map((c) => { const eu = effectiveUrgency(c); const u = URGENCY[eu]; return `
+        <a class="call linkrow" href="#shift/${c.shift.id}" style="${u ? `--uc:${u.color}` : ""}">
+          <div class="call-left">${u ? `<span class="urg" style="background:${u.color}">${u.label}</span>` : `<span class="urg none">–</span>`}</div>
           <div class="call-body">
             <div class="call-title"><span class="code">${esc(c.code || "?")}</span><span class="cname">${esc(c.codeName || "")}</span></div>
             <div class="call-meta"><span class="muted">${formatDate(c.shift.date)} ${esc(c.time || "")}</span> · ${c.disposition ? `<span class="meta-pill">${esc(dispositionShort(c))}</span>` : `<span class="meta-pill kesken">Kesken</span>`}${c.destination ? ` <span class="meta-pill dest">${esc(c.destination)}${c.tehoModule ? " · " + esc(c.tehoModule) : ""}</span>` : ""}</div>
             ${c.description ? `<div class="call-desc">${esc(c.description)}</div>` : ""}
           </div>
-        </a>`).join("")}
+        </a>`; }).join("")}
     </div>
   `;
   const q = document.getElementById("q");
