@@ -17,7 +17,11 @@ Erillistä palvelinta ei tarvita.
   sanalla), kuvaus ja lopputulos (kuljetettu / oma kyyti / X-5 / hoidettu kohteessa…)
   sekä kuljetuskohde (Meilahti, Malmi, Naistenklinikka, ULS…).
 - **Tehtäväkoodikirjasto** – ensihoidon (7-), pelastuksen (2-/4-) ja poliisin (0-)
-  johtoiset koodit sekä X-koodit. Haettavissa. Lähde: [EH-Info](https://ehinfo.fi/ensihoidon-tehtavakoodit/).
+  johtoiset koodit sekä X-koodit. Haettavissa. 7-alkuiset koodit päivitetty ERICA-
+  aikakauden listaan (mm. 784 Raajakipu, 786 Vartalokipu, 796 Monipotilastilanne).
+- **Edistyneet toimenpiteet** – keikkaan voi merkitä sisäänrakennetut, huomionarvoiset
+  toimenpiteet (intubaatio, kardioversio, neulatorakosenteesi, tahdistus, CPAP,
+  luuydinyhteys, kiristysside…). Perusasiat (EKG, i.v.-yhteys, vitaalit) on jätetty pois.
 - **Tilastot** – keikkoja per vuoro, kuljetusprosentti, hälytysastejakauma,
   johtovastuun jakauma, yleisimmät koodit ja kuljetuskohteet, kirjatut tunnit.
 - **Haku & suodatus** kaikista keikoista.
@@ -59,3 +63,8 @@ järjestelmiä.
 
 Puhdas HTML + CSS + JavaScript (ES-moduulit), ei riippuvuuksia eikä build-vaihetta.
 Tiedot `localStorage`-muistissa, offline service workerilla.
+
+## Lähteet
+
+- Tehtäväkoodit: [Ensihoito-online – Ensihoidon tehtäväkoodit](https://www.ensihoito-online.fi/ensihoidon-tehtavakoodit/) (päivitetty 29.3.2026) ja [EH-Info](https://ehinfo.fi/ensihoidon-tehtavakoodit/).
+- Toimenpiteet: [EH-Info – Mitä hoitotoimenpiteitä ensihoitaja voi tehdä](https://ehinfo.fi/mita-toimenpiteita-ensihoitaja-voi-tehda/), [Ensihoito-online](https://www.ensihoito-online.fi/ensihoito/) sekä Duodecim-katsaus ensihoidon vaativista toimenpiteistä.

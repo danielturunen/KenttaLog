@@ -23,16 +23,9 @@ const DEFAULT_DATA = {
     defaultStation: "",
     defaultUnit: "",
     defaultHt: true,
-    tags: [
-      "Kardioversio",
-      "PTT-trauma",
-      "Elvytys",
-      "Intubaatio",
-      "Synnytys",
-      "Monipotilastilanne",
-      "Lääkkeellinen rauhoittaminen",
-      "Hätäsiirto",
-    ],
+    // Käyttäjän omat lisätagit. Sisäänrakennetut toimenpiteet (codes.js PROCEDURES)
+    // näkyvät aina näiden lisäksi.
+    tags: [],
   },
 };
 

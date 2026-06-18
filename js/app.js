@@ -4,7 +4,7 @@ import {
   getSettings, updateSettings,
   exportJSON, importJSON, clearAll,
 } from "./storage.js";
-import { CODE_GROUPS, CODE_MAP, ALL_CODES, URGENCY } from "./codes.js";
+import { CODE_GROUPS, CODE_MAP, ALL_CODES, URGENCY, PROCEDURES } from "./codes.js";
 import { computeStats, shiftHours } from "./stats.js";
 import { STATIONS, stationLabel, ALL_UNITS, findStation, stationColor, DEFAULT_ACCENT } from "./stations.js";
 
@@ -503,6 +503,8 @@ function renderShiftSummary(id) {
 function openCallForm(shiftId, existing) {
   const settings = getSettings();
   const c = existing || { time: nowTime(), urgency: "C", disposition: "Kuljetettu" };
+  // Sisäänrakennetut toimenpiteet + käyttäjän omat tagit
+  const allTags = [...new Set([...PROCEDURES, ...(settings.tags || [])])];
   openModal(existing ? "Muokkaa keikkaa" : "Uusi keikka", `
     <div class="row">
       <label>Kellonaika<input type="time" id="c-time" value="${esc(c.time || "")}"></label>
@@ -547,9 +549,9 @@ function openCallForm(shiftId, existing) {
     </div>
     <label>Merkittävät tapaukset / toimenpiteet
       <div class="chips" id="c-tags">
-        ${settings.tags.map((t) => `<button type="button" class="chip ${(c.tags || []).includes(t) ? "on" : ""}" data-tag="${esc(t)}">${esc(t)}</button>`).join("")}
+        ${allTags.map((t) => `<button type="button" class="chip ${(c.tags || []).includes(t) ? "on" : ""}" data-tag="${esc(t)}">${esc(t)}</button>`).join("")}
       </div>
-      <input type="text" id="c-tagextra" placeholder="Muu, lisää pilkulla eroteltuna" value="${esc((c.tags || []).filter((t) => !settings.tags.includes(t)).join(", "))}">
+      <input type="text" id="c-tagextra" placeholder="Muu, lisää pilkulla eroteltuna" value="${esc((c.tags || []).filter((t) => !allTags.includes(t)).join(", "))}">
     </label>
     <label>Peruselintoiminnot (vapaaehtoinen)
       <div class="vitals">
@@ -816,9 +818,9 @@ function renderSettings() {
     </section>
 
     <section class="settings-block">
-      <h2>Merkittävät tapaukset / toimenpiteet</h2>
-      <p class="muted">Pikavalintojen tagit keikkalomakkeessa, pilkulla eroteltuna.</p>
-      <textarea id="set-tags" rows="3">${esc(st.tags.join(", "))}</textarea>
+      <h2>Omat lisätagit</h2>
+      <p class="muted">Sovelluksessa on jo ${PROCEDURES.length} sisäänrakennettua edistynyttä toimenpidettä (intubaatio, kardioversio, neulatorakosenteesi…). Lisää tähän vain omat ylimääräiset, pilkulla eroteltuna.</p>
+      <textarea id="set-tags" rows="3" placeholder="esim. Oma toimenpide 1, Oma toimenpide 2">${esc(st.tags.join(", "))}</textarea>
     </section>
 
     <section class="settings-block">

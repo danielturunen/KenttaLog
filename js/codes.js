@@ -18,7 +18,7 @@ export const CODE_GROUPS = [
           ["704", "Rintakipu"],
           ["705", "Rytmihäiriö"],
           ["706", "Aivoverenkiertohäiriö"],
-          ["707", "Hoitolaitossiirto"],
+          ["707", "Ensihoitopalveluun kuuluva hoitolaitossiirto"],
         ],
       },
       {
@@ -36,7 +36,7 @@ export const CODE_GROUPS = [
           ["744", "Haava"],
           ["745", "Kaatuminen"],
           ["746", "Isku"],
-          ["747", "Vamma: muu"],
+          ["747", "Puristuminen / muu vamma"],
         ],
       },
       {
@@ -55,28 +55,30 @@ export const CODE_GROUPS = [
         codes: [
           ["761", "Suusta"],
           ["762", "Gynekologinen / urologinen"],
-          ["763", "Korva tai nenä"],
-          ["764", "Säärihaava tai muu"],
+          ["763", "Korva / nenä"],
+          ["764", "Sääri / muu"],
         ],
       },
       {
         title: "Sairaus (liittyy löydös)",
         codes: [
-          ["770", "Sairauskohtaus"],
+          ["770", "Epäselvä sairauskohtaus"],
           ["771", "Sokeritasapainon häiriö"],
           ["772", "Kouristelu"],
           ["773", "Yliherkkyysreaktio"],
-          ["774", "Muu sairastuminen, yleistilan lasku"],
-          ["775", "Oksentelu, ripuli"],
+          ["774", "Muu sairastuminen"],
+          ["775", "Oksentelu / ripuli / virtsavaiva"],
         ],
       },
       {
         title: "Sairaus (ilmenee oireena)",
         codes: [
           ["781", "Vatsakipu"],
-          ["782", "Pää- tai niskasärky"],
-          ["783", "Selkä-, raaja- tai vartalokipu"],
+          ["782", "Pää- / niskakipu"],
+          ["783", "Selkä- / lonkkakipu"],
+          ["784", "Raajakipu"],
           ["785", "Mielenterveysongelma"],
+          ["786", "Vartalokipu"],
         ],
       },
       {
@@ -84,9 +86,10 @@ export const CODE_GROUPS = [
         codes: [
           ["790", "Hälytys puhelun aikana"],
           ["791", "Synnytys"],
-          ["792", "Varautuminen ensihoitotehtävään"],
+          ["792", "Varallaolo, valmiussiirto"],
           ["793", "Hoitolaitossiirto"],
-          ["794", "Muu sairaankuljetustehtävä"],
+          ["794", "Muu sairaankuljetus- / aikatilaustehtävä"],
+          ["796", "Monipotilastilanne / suuronnettomuus"],
         ],
       },
     ],
@@ -247,3 +250,39 @@ export const URGENCY = {
   C: { label: "C", desc: "Peruselintoiminnot vakaat, tarkistettava", color: "#e0b21f" },
   D: { label: "D", desc: "Kiireetön", color: "#2f9e44" },
 };
+
+// Edistyneet / huomionarvoiset toimenpiteet ja tilanteet, joita voi merkitä keikkaan.
+// EI perusasioita (EKG, i.v.-yhteys, monitorointi, vitaalit, auskultaatio, happihoito).
+// Lähteet: ensihoito-online.fi, ehinfo.fi, Duodecim (ks. README).
+export const PROCEDURES = [
+  // Ilmatie & hengitys
+  "Intubaatio",
+  "Supraglottinen ilmatie (i-gel)",
+  "Krikotyreotomia (hätäilmatie)",
+  "Neulatorakosenteesi",
+  "CPAP",
+  "NIV (non-invasiivinen ventilaatio)",
+  // Verenkierto & elvytys
+  "Elvytys",
+  "Mekaaninen paineluelvytin (LUCAS)",
+  "Kardioversio",
+  "Transkutaaninen tahdistus",
+  "Luuydinyhteys (i.o.)",
+  "Vasoaktiivinen lääkeinfuusio",
+  "Elvytyksen lopetus / kuolleen toteaminen",
+  // Trauma
+  "PTT-trauma",
+  "Kiristysside (tourniquet)",
+  "Painepakkaus / hemostaattinen sidos",
+  "Lantion tukivyö",
+  "Vetolasta",
+  "Murtuman / nivelen reponointi",
+  // Lääkkeellinen & muu
+  "Lääkeavusteinen rauhoittaminen",
+  "Liuotushoito (trombolyysi)",
+  "Hätäverensiirto",
+  // Operatiivinen
+  "Synnytys",
+  "Monipotilastilanne",
+  "Hätäsiirto",
+];
