@@ -311,6 +311,7 @@ export const X_SUB_MAP = (() => {
 // Lähteet: ensihoito-online.fi, ehinfo.fi, Duodecim (ks. README).
 export const PROCEDURES = [
   // Ilmatie & hengitys
+  "Maskiventilaatio",
   "Intubaatio",
   "Supraglottinen ilmatie (i-gel)",
   "Krikotyreotomia (hätäilmatie)",
