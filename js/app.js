@@ -994,7 +994,42 @@ function renderCodes() {
   cq.oninput = debounce(() => { codeQuery = cq.value; renderCodes(); restoreFocus("cq"); }, 200);
 }
 
-// ---------- Työkalut: laskurit + koodivisa ----------
+// Yleisesti opetetut kliiniset muistilistat (ei Ensihoito-oppaasta kopioitua sisältöä).
+const MEMORY_AIDS = [
+  { t: "cABCDE – ensiarvio", items: [
+    "c – Massiivin ulkoisen verenvuodon tyrehdytys (kiristysside / painepakkaus)",
+    "A – Ilmatie ja rangan tuenta",
+    "B – Hengitys: taajuus, SpO₂, hengitysäänet",
+    "C – Verenkierto: pulssi, RR, ihon lämpö, vuodot",
+    "D – Tajunta: GCS, pupillat, verensokeri, raajojen liike",
+    "E – Paljastus: vammat, iho, lämpötila (estä jäähtyminen)",
+  ]},
+  { t: "ISBAR – raportointi ja luovutus", items: [
+    "I – Tunnista: oma nimi/yksikkö ja potilas",
+    "S – Tilanne: nykyinen ongelma ja kiireellisyys",
+    "B – Tausta: perussairaudet, lääkitys, tapahtumat",
+    "A – Arvio: peruselintoiminnot, työdiagnoosi",
+    "R – Toimintaehdotus: mitä pyydät / suosittelet",
+  ]},
+  { t: "SAMPLE – esitiedot", items: [
+    "S – Oireet (Symptoms)",
+    "A – Allergiat",
+    "M – Lääkitys (Medication)",
+    "P – Perussairaudet (Past history)",
+    "L – Viimeksi syöty/juotu (Last intake)",
+    "E – Tapahtumat ennen oireita (Events)",
+  ]},
+  { t: "OPQRST – kipuanamneesi", items: [
+    "O – Alku (Onset)",
+    "P – Provosoivat/lievittävät tekijät",
+    "Q – Laatu (Quality)",
+    "R – Säteily (Radiation)",
+    "S – Voimakkuus (Severity, VAS 0–10)",
+    "T – Kesto/ajallisuus (Time)",
+  ]},
+];
+
+// ---------- Työkalut: muistilistat + laskurit + koodivisa ----------
 function renderTools() {
   app.innerHTML = `
     <header class="page-head"><h1>Työkalut</h1></header>
@@ -1003,6 +1038,22 @@ function renderTools() {
       <h2>Jakson raportti</h2>
       <p class="muted">Koko harjoittelun yhteenveto tulostettavaksi / PDF:ksi ohjaajalle.</p>
       <a class="btn primary" href="#report">Avaa jakson raportti →</a>
+    </section>
+
+    <section class="settings-block">
+      <h2>Muistilistat</h2>
+      <p class="muted">Yleiset kliiniset muistikehykset nopeaan kertaukseen.</p>
+      ${MEMORY_AIDS.map((m) => `<details class="aid"><summary>${esc(m.t)}</summary><ul>${m.items.map((i) => `<li>${esc(i)}</li>`).join("")}</ul></details>`).join("")}
+    </section>
+
+    <section class="settings-block">
+      <h2>Hoito-ohjeet ja lisätieto</h2>
+      <p class="muted">Viralliset, ajantasaiset hoito-ohjeet näistä lähteistä. <em>Ensihoito-opas (Duodecim)</em> on tekijänoikeudella suojattu, joten KenttäLog linkittää siihen eikä kopioi sisältöä.</p>
+      <div class="btn-row">
+        <a class="btn" href="https://www.oppiportti.fi/op/opk04598" target="_blank" rel="noopener">Ensihoito-opas (Oppiportti)</a>
+        <a class="btn" href="https://www.ensihoito-online.fi/ensihoidon-tehtavakoodit/" target="_blank" rel="noopener">Ensihoito-online</a>
+        <a class="btn" href="https://www.kaypahoito.fi/" target="_blank" rel="noopener">Käypä hoito</a>
+      </div>
     </section>
 
     <section class="settings-block">
