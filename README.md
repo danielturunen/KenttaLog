@@ -1,4 +1,4 @@
 # 🚑 KenttäLog
 
 🔗 Sovellus:
-https://danielturunen.github.io/KenttaLog/#/
+https://danielturunen.github.io/KenttaLog
