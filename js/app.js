@@ -103,6 +103,13 @@ const DISPOSITIONS = [
 // Oma rooli toimenpiteissä (valvontataso)
 const ROLES = ["", "Suoritin itse", "Avustin", "Seurasin"];
 
+// Meilahden teho-osaston moduulit (valitaan, kun kohde on teho-osasto)
+const TEHO_MODULES = ["Moduulit AB", "Moduulit C", "ED"];
+// Onko kuljetuskohde Meilahden teho-osasto?
+function isTeho(dest) {
+  return /teho/i.test(dest || "");
+}
+
 // X-koodin tarkennevalikon optiot (esim. X-4 -> X-41…X-45).
 function xSubOptions(disposition, selected) {
   const base = (disposition || "").split(" ")[0];
@@ -538,7 +545,7 @@ function callRow(shiftId, c) {
         ${vitalsLine(c.vitals)}
         <div class="call-meta">
           ${c.disposition ? `<span class="meta-pill">${esc(dispositionShort(c))}</span>` : `<span class="meta-pill kesken">Kesken</span>`}
-          ${c.destination ? `<span class="meta-pill dest">${esc(c.destination)}</span>` : ""}
+          ${c.destination ? `<span class="meta-pill dest">${esc(c.destination)}${c.tehoModule ? " · " + esc(c.tehoModule) : ""}</span>` : ""}
           ${c.disposition === "Kuljetettu" && c.transportCode ? `<span class="meta-pill">Kulj. ${esc(c.transportCode)}${c.transportUrgency ? " " + esc(c.transportUrgency) : ""}</span>` : ""}
           ${(c.tags || []).map((t) => `<span class="meta-pill tag">${esc(t)}</span>`).join("")}
           ${c.role ? `<span class="meta-pill role">${esc(c.role)}</span>` : ""}
@@ -605,7 +612,8 @@ function renderShiftSummary(id) {
           ${calls.length ? calls.map((c) => {
             const v = c.vitals;
             const vs = v ? [v.rr && "RR " + v.rr, v.hr && "P " + v.hr, v.spo2 && "SpO₂ " + v.spo2, v.gcs && "GCS " + v.gcs].filter(Boolean).join(", ") : "";
-            let disp = c.disposition ? [dispositionShort(c), c.destination].filter(Boolean).join(": ") : "Kesken";
+            const destLabel = c.destination ? (c.tehoModule ? `${c.destination} (${c.tehoModule})` : c.destination) : "";
+            let disp = c.disposition ? [dispositionShort(c), destLabel].filter(Boolean).join(": ") : "Kesken";
             if (c.disposition === "Kuljetettu" && c.transportCode) {
               disp += ` (${c.transportCode}${c.transportUrgency ? " " + c.transportUrgency : ""})`;
             }
@@ -680,6 +688,13 @@ function openCallForm(shiftId, existing) {
           ${settings.destinations.map((d) => `<option value="${esc(d)}">`).join("")}
         </datalist>
       </label>
+      <div id="c-tehowrap" style="${isTeho(c.destination) ? "" : "display:none"}">
+        <label>Teho-osaston moduuli
+          <div class="seg" id="c-teho">
+            ${TEHO_MODULES.map((m) => `<button type="button" data-m="${esc(m)}" class="${(c.tehoModule || "") === m ? "on" : ""}">${esc(m)}</button>`).join("")}
+          </div>
+        </label>
+      </div>
       <div class="row">
         <label>Kuljetuskoodi
           <input type="text" id="c-tcode" list="codelist" value="${esc(c.transportCode || c.code || "")}" placeholder="oletus = hälytyskoodi" autocomplete="off">
@@ -737,6 +752,7 @@ function openCallForm(shiftId, existing) {
         disposition,
         xSub,
         destination: transported ? val("c-dest") : "",
+        tehoModule: transported && isTeho(val("c-dest")) ? (document.querySelector("#c-teho .on")?.dataset.m || "") : "",
         transportCode,
         transportCodeName: CODE_MAP.get(transportCode)?.name || "",
         transportUrgency,
@@ -810,6 +826,13 @@ function openCallForm(shiftId, existing) {
     xwrap.style.display = isXnow ? "" : "none";
     if (isXnow) document.getElementById("c-xsub").innerHTML = xSubOptions(v, "");
   };
+  const destEl = document.getElementById("c-dest");
+  destEl.addEventListener("input", () => {
+    document.getElementById("c-tehowrap").style.display = isTeho(destEl.value) ? "" : "none";
+  });
+  document.querySelectorAll("#c-teho button").forEach((b) => {
+    b.onclick = () => document.querySelectorAll("#c-teho button").forEach((x) => x.classList.toggle("on", x === b));
+  });
   document.querySelectorAll("#c-tags .chip").forEach((b) => {
     b.onclick = () => b.classList.toggle("on");
   });
@@ -875,7 +898,7 @@ function renderCalls() {
           <div class="call-left">${c.urgency ? `<span class="urg" style="background:${URGENCY[c.urgency].color}">${c.urgency}</span>` : `<span class="urg none">–</span>`}</div>
           <div class="call-body">
             <div class="call-title"><span class="code">${esc(c.code || "?")}</span><span class="cname">${esc(c.codeName || "")}</span></div>
-            <div class="call-meta"><span class="muted">${formatDate(c.shift.date)} ${esc(c.time || "")}</span> · ${c.disposition ? `<span class="meta-pill">${esc(dispositionShort(c))}</span>` : `<span class="meta-pill kesken">Kesken</span>`}${c.destination ? ` <span class="meta-pill dest">${esc(c.destination)}</span>` : ""}</div>
+            <div class="call-meta"><span class="muted">${formatDate(c.shift.date)} ${esc(c.time || "")}</span> · ${c.disposition ? `<span class="meta-pill">${esc(dispositionShort(c))}</span>` : `<span class="meta-pill kesken">Kesken</span>`}${c.destination ? ` <span class="meta-pill dest">${esc(c.destination)}${c.tehoModule ? " · " + esc(c.tehoModule) : ""}</span>` : ""}</div>
             ${c.description ? `<div class="call-desc">${esc(c.description)}</div>` : ""}
           </div>
         </a>`).join("")}

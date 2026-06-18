@@ -10,6 +10,8 @@ const DEFAULT_DATA = {
   settings: {
     destinations: [
       "Meilahti",
+      "Meilahden CCU",
+      "Meilahden teho-osasto",
       "Malmi",
       "Naistenklinikka",
       "Uusi lastensairaala (ULS)",
@@ -221,7 +223,7 @@ export function exportCSV() {
       c.urgency || "",
       c.lead || "",
       c.disposition || "",
-      c.destination || "",
+      c.destination ? (c.tehoModule ? `${c.destination} (${c.tehoModule})` : c.destination) : "",
       c.transportCode || "",
       c.transportUrgency || "",
       (c.tags || []).join(", "),
