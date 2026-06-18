@@ -234,7 +234,7 @@ function renderHome() {
   });
   const body = document.getElementById("home-body");
   if (homeView === "calendar") body.innerHTML = calendarHtml(shifts);
-  else body.innerHTML = `<div class="list">${shifts.map(shiftCard).join("")}</div>`;
+  else body.innerHTML = `<div class="list">${orderedShifts(shifts).map(shiftCard).join("")}</div>`;
 
   if (homeView === "calendar") {
     document.getElementById("cal-prev").onclick = () => { calCursor.setMonth(calCursor.getMonth() - 1); renderHome(); };
@@ -303,6 +303,28 @@ function emptyState() {
     </div>`;
 }
 
+// Vuoron suhde nykyhetkeen: 0 = tänään / käynnissä, 1 = tuleva, 2 = mennyt.
+function shiftCategory(s, now = new Date()) {
+  const todayISO = localISO(now);
+  const yest = new Date(now); yest.setDate(yest.getDate() - 1);
+  if (s.date === todayISO) return 0;
+  // Yövuoro (21–9) jatkuu seuraavan päivän aamuun → käynnissä klo < 9
+  if (s.type === "night" && s.date === localISO(yest) && now.getHours() < 9) return 0;
+  if (s.date > todayISO) return 1;
+  return 2;
+}
+
+// Tänään ensin, sitten tulevat (lähin ensin), lopuksi menneet (uusin ensin).
+function orderedShifts(shifts) {
+  const now = new Date();
+  return shifts.slice().sort((a, b) => {
+    const ca = shiftCategory(a, now), cb = shiftCategory(b, now);
+    if (ca !== cb) return ca - cb;
+    if (ca === 1) return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; // tulevat nousevasti
+    return a.date < b.date ? 1 : a.date > b.date ? -1 : 0;               // tänään/menneet laskevasti
+  });
+}
+
 function shiftCard(s) {
   const calls = s.calls || [];
   const tag = s.type === "day"
@@ -315,13 +337,14 @@ function shiftCard(s) {
     return `<span class="dot" style="background:${col}" title="${esc(c.code || "")}"></span>`;
   }).join("");
   const level = s.ht === false ? `<span class="pill pt">PT</span>` : `<span class="pill ht">HT</span>`;
+  const today = shiftCategory(s) === 0 ? `<span class="pill now">Tänään</span>` : "";
   const sub = [s.unit, s.station].filter(Boolean).map(esc).join(" · ");
   const accent = stationColor(s.station) || "var(--primary)";
   return `
-    <a class="card shift-card" href="#shift/${s.id}" style="--sc:${accent}">
+    <a class="card shift-card${today ? " is-today" : ""}" href="#shift/${s.id}" style="--sc:${accent}">
       <div class="card-top">
         <div class="date">${formatDate(s.date)}</div>
-        <span class="pills">${level}${tag}</span>
+        <span class="pills">${today}${level}${tag}</span>
       </div>
       ${sub ? `<div class="muted card-sub">${sub}</div>` : ""}
       <div class="card-bottom">
@@ -1036,7 +1059,8 @@ function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
 }
 function val(id) { return document.getElementById(id)?.value ?? ""; }
-function today() { return new Date().toISOString().slice(0, 10); }
+function localISO(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
+function today() { return localISO(new Date()); }
 function nowTime() { return new Date().toTimeString().slice(0, 5); }
 function splitList(s) { return s.split(",").map((x) => x.trim()).filter(Boolean); }
 function formatDate(iso) {

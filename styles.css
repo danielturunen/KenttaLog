@@ -124,6 +124,8 @@ a { color: inherit; text-decoration: none; }
 .pill.night { background: color-mix(in srgb, #6f8cff 22%, var(--surface)); color: #c7d2ff; }
 .pill.ht { background: color-mix(in srgb, var(--primary) 26%, var(--surface)); color: color-mix(in srgb, var(--primary) 70%, #fff); }
 .pill.pt { background: var(--surface-2); color: var(--muted); }
+.pill.now { background: var(--primary); color: #fff; }
+.shift-card.is-today { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary), var(--shadow); }
 
 /* ---------- Empty state ---------- */
 .empty { text-align: center; padding: 44px 16px 28px; color: var(--muted); }
