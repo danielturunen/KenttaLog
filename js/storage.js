@@ -183,6 +183,23 @@ export function clearAll() {
   save();
 }
 
+// ---- Koodimuistiinpanojen erillinen vienti / tuonti ----
+export function exportCodeNotes() {
+  return JSON.stringify({ kind: "kenttalog-codenotes", codeNotes: load().settings.codeNotes || {} }, null, 2);
+}
+
+export function importCodeNotes(json, { merge = true } = {}) {
+  const parsed = JSON.parse(json);
+  const notes = parsed && parsed.codeNotes ? parsed.codeNotes : (parsed && typeof parsed === "object" ? parsed : null);
+  if (!notes || typeof notes !== "object") {
+    throw new Error("Tiedosto ei ole kelvollinen muistiinpanotiedosto.");
+  }
+  const data = load();
+  data.settings.codeNotes = merge ? { ...(data.settings.codeNotes || {}), ...notes } : { ...notes };
+  save();
+  return Object.keys(notes).length;
+}
+
 // ---- CSV-vienti ----
 
 export function exportCSV() {

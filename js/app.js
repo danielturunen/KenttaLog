@@ -4,6 +4,7 @@ import {
   getSettings, updateSettings,
   getCodeNote, setCodeNote,
   exportJSON, importJSON, clearAll,
+  exportCodeNotes, importCodeNotes,
 } from "./storage.js";
 import { CODE_GROUPS, CODE_MAP, ALL_CODES, URGENCY, PROCEDURES, X_SUBCODES } from "./codes.js";
 import { computeStats, shiftHours } from "./stats.js";
@@ -1322,6 +1323,16 @@ function renderSettings() {
       </div>
     </section>
 
+    <section class="settings-block">
+      <h2>Omat koodimuistiinpanot</h2>
+      <p class="muted">Vie ja tuo omat koodikohtaiset muistiinpanosi erillisenä tiedostona (esim. toiselle laitteelle). Tuonti yhdistyy nykyisiin – ne näkyvät heti koodeilla ja keikkalomakkeessa.</p>
+      <div class="btn-row">
+        <button class="btn" id="expNotes">⬇︎ Vie muistiinpanot</button>
+        <button class="btn" id="impNotesBtn">⬆︎ Tuo muistiinpanot</button>
+        <input type="file" id="impNotesFile" accept="application/json" hidden>
+      </div>
+    </section>
+
     <section class="settings-block danger-block">
       <h2>Vaara-alue</h2>
       <button class="btn danger" id="wipe">Tyhjennä kaikki tiedot</button>
@@ -1364,6 +1375,22 @@ function renderSettings() {
         toast("Varmuuskopio tuotu");
         location.hash = "#/";
         route();
+      } catch (err) {
+        alert("Tuonti epäonnistui: " + err.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+  document.getElementById("expNotes").onclick = () => download("kenttalog-muistiinpanot.json", exportCodeNotes(), "application/json");
+  document.getElementById("impNotesBtn").onclick = () => document.getElementById("impNotesFile").click();
+  document.getElementById("impNotesFile").onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const n = importCodeNotes(reader.result);
+        toast(`${n} muistiinpanoa tuotu`);
       } catch (err) {
         alert("Tuonti epäonnistui: " + err.message);
       }
