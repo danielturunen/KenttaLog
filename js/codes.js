@@ -103,8 +103,8 @@ export const CODE_GROUPS = [
       {
         title: "X, ei kuljetusta",
         codes: [
-          ["X-0", "Tekninen este"],
-          ["X-1", "Kuollut"],
+          ["X-0", "Tehtävän suorittaminen estyy"],
+          ["X-1", "Potilas kuollut"],
           ["X-2", "Terveydentila määritelty, ohjattu poliisin suojaan"],
           ["X-3", "Pyydetty kohteeseen muuta apua"],
           ["X-4", "Muu kuljetus"],
@@ -251,55 +251,51 @@ export const URGENCY = {
   D: { label: "D", desc: "Kiireetön", color: "#2f9e44" },
 };
 
-// X-koodien tarkenteet (alakoodit). Lähde: käyttäjän toimittama virallinen lista.
+// X-koodien tarkenteet (alakoodit). Lähde: EH-Info (ehinfo.fi).
 export const X_SUBCODES = {
   "X-0": [
     ["X-01", "Tekninen este"],
-    ["X-02", "Sääeste"],
-    ["X-03", "Ei helikopteria käytettävissä"],
-    ["X-04", "Ei soveltuvaa laskupaikkaa helikopterille"],
-    ["X-05", "Tehtävä maayksikölle"],
-    ["X-06", "Lentohenkilöstön työajan ylitys"],
+    ["X-02", "Henkilöstön työajan ylitys"],
+    ["X-03", "Tehtävä hoidettu maayksiköllä"],
+    ["X-04", "Sääeste"],
+    ["X-05", "Ei helikopteria käytettävissä"],
+    ["X-06", "Ei helikopterille soveltuvaa laskeutumispaikkaa"],
   ],
   "X-1": [
-    ["X-11", "Potilas menehtynyt, ei aktiivisia hoitotoimia"],
-    ["X-12", "Potilas menehtynyt hoitotoimista huolimatta"],
+    ["X-11", "Potilas kuollut, ei aktiivisia hoitotoimenpiteitä"],
+    ["X-12", "Potilas kuollut, aktiiviset hoitotoimenpiteet"],
   ],
   "X-2": [
-    ["X-21", "Terveydentila määritetty, ohjattu poliisin suojaan"],
+    ["X-21", "Potilas siirtyy poliisin valvontaan"],
   ],
   "X-3": [
     ["X-31", "Pyydetty kohteeseen muuta apua"],
   ],
   "X-4": [
     ["X-41", "Kuljetus toisella ensihoitoyksiköllä"],
-    ["X-42", "Kuljetus toisella ensihoitoyksiköllä, ensihoitaja tai kenttäjohtaja saattaa"],
+    ["X-42", "Kuljetus toisella ensihoitoyksiköllä, kenttäjohtaja tai ensihoitaja saattaa"],
     ["X-43", "Kuljetus toisella ensihoitoyksiköllä, ensihoitolääkäri saattaa"],
-    ["X-44", "Ohjataan jatkohoitoon muulla kyydillä"],
-    ["X-45", "Hoidon tarpeen arviointi tehty etänä, ohjataan hoitoon muulla kyydillä"],
+    ["X-44", "Ohjataan jatkohoitoon muulla kuljetuksella"],
   ],
   "X-5": [
-    ["X-51", "Ei tarvetta, terveydentila määritetty"],
+    ["X-51", "Ei tarvetta ensihoitoon tai hoitotoimenpiteisiin"],
+    ["X-52", "Etäyhteydellä tehdyn hoidontarpeen arvion perusteella ei tarvetta ensihoitoon tai hoitotoimenpiteisiin"],
   ],
   "X-6": [
-    ["X-61", "Potilas kieltäytyi hoitotoimista ja kuljetuksesta"],
-    ["X-62", "Potilas kieltäytyi kuljetuksesta"],
+    ["X-61", "Potilas kieltäytyi terveydentilan arvioinnista tai hoidosta"],
+    ["X-62", "Potilas kieltäytyi jatkohoitoon kuljettamisesta"],
   ],
   "X-7": [
-    ["X-71", "Ei potilasta tai potilasta ei löydy"],
+    ["X-71", "Ei potilasta"],
   ],
   "X-8": [
-    ["X-81", "Potilas hoidettu kohteessa pysyväisohjeeseen tai lääkärin konsultaatioon perustuen"],
-    ["X-82", "Potilas hoidettu kohteessa"],
+    ["X-81", "Potilas hoidettu kohteessa, hoito-ohje pyydetty tai hoidettu pysyväisohjeen mukaan"],
   ],
   "X-9": [
-    ["X-91", "Tehtävän peruutus hätäkeskuksen antaman lisätiedon perusteella"],
-    ["X-92", "Tehtävän peruutus muun lisätiedon perusteella"],
-    ["X-93", "Tehtävän peruutus kohteessa olevan yksikön toimesta"],
-    ["X-94", "Tehtävän peruutus ensihoidon kenttäjohdon / tilannekeskuksen toimesta"],
-    ["X-95", "Ei lääkäriyksikön tarvetta"],
-    ["X-96", "Tehtävä ohjattu paremmin soveltuvalle lääkäriyksikölle"],
-    ["X-97", "Tehtävän peruutus sijainnin vuoksi"],
+    ["X-91", "Peruutus hätäkeskuksen lisätiedon perusteella"],
+    ["X-92", "Peruutus muun lisätiedon perusteella"],
+    ["X-93", "Peruutus kohteessa olevan yksikön toimesta"],
+    ["X-94", "Peruutus tilannekeskuksen / kenttäjohtajan / ensihoitolääkärin toimesta"],
   ],
 };
 
