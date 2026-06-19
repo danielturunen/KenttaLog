@@ -698,7 +698,7 @@ function openCallForm(shiftId, existing) {
       <div class="code-note" id="c-note">${codeNoteHtml(c.code)}</div>
     </label>
     <p class="form-note">Voit tallentaa pelkän hälytyskoodin nyt ja täydentää loput myöhemmin.</p>
-    <div id="c-guide">${guidanceHtml(c.code)}</div>
+    <div id="c-guide">${guidanceHtml(c.code, c.urgency)}</div>
     <label>Kuvaus
       <textarea id="c-desc" rows="3" placeholder="Lyhyt kuvaus keikasta (ei tunnistetietoja)">${esc(c.description || "")}</textarea>
       <div class="tips" id="c-tips">${tipsHtml(tipsFor(c.description))}</div>
@@ -833,10 +833,15 @@ function openCallForm(shiftId, existing) {
     container.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x.dataset.u === value));
   }
 
+  const currentUrg = () => document.querySelector("#c-urg .on")?.dataset.u || "";
+  const refreshGuide = () => {
+    document.getElementById("c-guide").innerHTML = guidanceHtml(search.value.trim().toUpperCase(), currentUrg());
+  };
   document.querySelectorAll("#c-urg button").forEach((b) => {
     b.onclick = () => {
       selectUrg(document.getElementById("c-urg"), b.dataset.u);
       if (!turgEdited) selectUrg(document.getElementById("c-turg"), b.dataset.u);
+      refreshGuide();
     };
   });
   document.querySelectorAll("#c-turg button").forEach((b) => {
@@ -848,7 +853,7 @@ function openCallForm(shiftId, existing) {
     document.getElementById("c-codehint").innerHTML = codeHint(code);
     document.getElementById("c-info").href = infoUrlForCode(code);
     document.getElementById("c-note").innerHTML = codeNoteHtml(code);
-    document.getElementById("c-guide").innerHTML = guidanceHtml(code);
+    refreshGuide();
     if (!tcodeEdited) tcodeEl.value = code;
   };
   document.getElementById("c-note").onclick = (e) => {
@@ -1022,38 +1027,78 @@ function codeGuidance(code) {
   const cd = (spec?.cd?.length ? spec.cd : GUIDE_BASE_CD).slice(0, 6);
   return { ab, cd, focus: spec?.focus || info.name, primary: spec?.primary || "ab" };
 }
-function guidanceHtml(code) {
+function guidanceHtml(code, urgency) {
   code = (code || "").toUpperCase();
   const g = codeGuidance(code);
   if (!g) return "";
   const info = codeInfo(code);
+  const u = (urgency || "").toUpperCase();
+  const tier = (u === "A" || u === "B") ? "ab" : (u === "C" || u === "D") ? "cd" : null;
   const list = (arr) => `<ul class="g-list">${arr.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`;
-  const infoBlock = info ? `
-      ${info.what ? `<p class="g-what">${esc(info.what)}</p>` : ""}
-      ${info.assess?.length ? `<div class="g-sec"><h4>Keskeinen arvio</h4>${list(info.assess)}</div>` : ""}
-      ${info.actions?.length ? `<div class="g-sec"><h4>Hoidon painopisteet</h4>${list(info.actions)}</div>` : ""}
-      ${info.red?.length ? `<div class="g-sec g-redflags"><h4>⚠️ Hälyttävät löydökset</h4>${list(info.red)}</div>` : ""}` : "";
+  const what = info?.what ? `<p class="g-what">${esc(info.what)}</p>` : "";
+  const assess = info?.assess?.length ? `<div class="g-sec"><h4>Keskeinen arvio</h4>${list(info.assess)}</div>` : "";
+  const note = `<p class="g-note">Yleistä, itse koostettua ensihoidon tietoa (lähteinä mm. StatPearls, ERC, AHA/ASA, WHO). Noudata alueellista hoito-ohjetta – ei lääkeannoksia, ei korvaa virallista ohjetta.</p>`;
+
+  if (tier === "ab") {
+    return `<details class="guidance g-acute" open>
+      <summary>🚨 ${esc(u)}-${esc(code)} · kiireellinen lähestyminen</summary>
+      <div class="g-body">
+        ${what}
+        <div class="g-tier g-ab"><h4>Toimi heti – painopisteet</h4>${list(g.ab)}</div>
+        ${info?.red?.length ? `<div class="g-sec g-redflags"><h4>⚠️ Tunnista / sulje pois heti</h4>${list(info.red)}</div>` : ""}
+        ${assess}
+        ${note}
+      </div>
+    </details>`;
+  }
+  if (tier === "cd") {
+    return `<details class="guidance g-stable" open>
+      <summary>🩺 ${esc(u)}-${esc(code)} · vakaa, kiireetön lähestyminen</summary>
+      <div class="g-body">
+        ${what}
+        <div class="g-tier g-cd"><h4>Systemaattinen ote</h4>${list(g.cd)}</div>
+        ${info?.red?.length ? `<div class="g-sec g-redflags"><h4>⚠️ Sulje pois ennen kuin hoidat kiireettömänä</h4>${list(info.red)}</div>` : ""}
+        ${assess}
+        ${note}
+      </div>
+    </details>`;
+  }
+  // Ei valittua hälytysastetta → näytä molemmat (esim. koodikirjasto / referenssi)
   return `<details class="guidance">
-    <summary>🧭 Tietoa tehtävästä & ohjerunko (A/B vs C/D)</summary>
+    <summary>🧭 Tietoa tehtävästä & lähestyminen kiireellisyyden mukaan</summary>
     <div class="g-body">
-      ${infoBlock}
-      <div class="g-tier g-ab"><h4>A / B · kiireellinen, korkeariskinen</h4>${list(g.ab)}</div>
-      <div class="g-tier g-cd"><h4>C / D · vakaa, kiireetön</h4>${list(g.cd)}</div>
-      <p class="g-note">Yleistä, itse koostettua ensihoidon tietoa (lähteinä mm. StatPearls, ERC, AHA/ASA, WHO). Täydennä omalla materiaalillasi ja noudata alueellista hoito-ohjetta. Ei lääkeannoksia – ei korvaa virallista ohjetta.</p>
+      ${what}
+      <p class="g-hint">Valitse hälytysaste, niin näet juuri sille keikalle painottuvan ohjeen. Yleisesti:</p>
+      <div class="g-tier g-ab"><h4>A / B · kiireellinen – toimi heti</h4>${list(g.ab)}</div>
+      <div class="g-tier g-cd"><h4>C / D · vakaa – systemaattinen ote</h4>${list(g.cd)}</div>
+      ${info?.red?.length ? `<div class="g-sec g-redflags"><h4>⚠️ Hälyttävät löydökset / pois suljettavat</h4>${list(info.red)}</div>` : ""}
+      ${assess}
+      ${note}
     </div>
   </details>`;
 }
-function guidanceMarkdown(code) {
+function guidanceMarkdown(code, urgency) {
   code = (code || "").toUpperCase();
   const g = codeGuidance(code);
   if (!g) return "";
   const info = codeInfo(code);
+  const u = (urgency || "").toUpperCase();
+  const tier = (u === "A" || u === "B") ? "ab" : (u === "C" || u === "D") ? "cd" : null;
   const sec = (title, arr) => arr?.length ? `### ${title}\n${arr.map((x) => `- ${x}`).join("\n")}\n\n` : "";
   let md = "";
   if (info?.what) md += `${info.what}\n\n`;
-  if (info) { md += sec("Keskeinen arvio", info.assess); md += sec("Hoidon painopisteet", info.actions); md += sec("Hälyttävät löydökset", info.red); }
-  md += `## A/B – kiireellinen\n${g.ab.map((x) => `- ${x}`).join("\n")}\n\n## C/D – vakaa\n${g.cd.map((x) => `- ${x}`).join("\n")}\n`;
-  return md;
+  if (info) md += sec("Keskeinen arvio", info.assess);
+  if (tier === "ab") {
+    md += `## Kiireellinen (A/B) – toimi heti\n${g.ab.map((x) => `- ${x}`).join("\n")}\n\n`;
+    md += sec("Sulje pois / tunnista heti", info?.red);
+  } else if (tier === "cd") {
+    md += `## Vakaa (C/D) – systemaattinen ote\n${g.cd.map((x) => `- ${x}`).join("\n")}\n\n`;
+    md += sec("Sulje pois ennen kiireetöntä linjaa", info?.red);
+  } else {
+    md += `## A/B – kiireellinen\n${g.ab.map((x) => `- ${x}`).join("\n")}\n\n## C/D – vakaa\n${g.cd.map((x) => `- ${x}`).join("\n")}\n\n`;
+    md += sec("Hälyttävät löydökset", info?.red);
+  }
+  return md.trimEnd() + "\n";
 }
 
 function codeNoteHtml(code) {
