@@ -353,6 +353,23 @@ a { color: inherit; text-decoration: none; }
 .cn-prev-wrap { margin-top: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; background: var(--surface-2); }
 .cn-prev-lab { font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 800; margin-bottom: 6px; }
 
+/* ---------- Tapahtumaloki (timeline) ---------- */
+.tl-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.tl-btn { background: var(--surface-2); border: 1px solid var(--border); color: var(--text); border-radius: 999px; padding: 6px 11px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: background .12s, border-color .12s; }
+.tl-btn:active { background: color-mix(in srgb, var(--primary) 22%, var(--surface-2)); border-color: var(--primary); }
+.tl-add { display: flex; gap: 8px; margin-top: 9px; }
+.tl-add input { flex: 1; }
+.btn-sm { background: var(--primary); color: #fff; border: none; border-radius: var(--radius-sm); padding: 0 14px; font-weight: 700; font-size: .85rem; cursor: pointer; white-space: nowrap; }
+.tl-list { margin-top: 10px; }
+.tl-rows { display: flex; flex-direction: column; gap: 4px; }
+.tl-item { display: flex; align-items: center; gap: 10px; background: var(--surface-2); border-radius: var(--radius-sm); padding: 7px 11px; }
+.tl-time { font-variant-numeric: tabular-nums; font-weight: 800; color: var(--primary); font-size: .9rem; }
+.tl-label { flex: 1; font-size: .9rem; }
+.tl-del { background: none; border: none; color: var(--muted); font-size: 1.3rem; line-height: 1; cursor: pointer; padding: 0 4px; }
+.tl-del:active { color: var(--danger, #e5484d); }
+.meta-pill.tl { background: color-mix(in srgb, #6366f1 30%, var(--surface)); color: #c7c9ff; }
+.pv-rowtl { font-size: .82rem; color: var(--muted); margin-top: 3px; font-variant-numeric: tabular-nums; }
+
 /* ---------- Calendar ---------- */
 .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .cal-head .iconbtn { font-size: 1.7rem; }

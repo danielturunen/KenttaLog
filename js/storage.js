@@ -30,6 +30,11 @@ const DEFAULT_DATA = {
     tags: [],
     // Osaamistavoitteet harjoittelujaksolle: [{ tag, target }]
     goals: [],
+    // Harjoittelujakson tiedot ja tavoitteet
+    internshipStart: "",
+    internshipEnd: "",
+    targetHours: 0,
+    targetShifts: 0,
     // Käyttäjän omat muistiinpanot per tehtäväkoodi: { "704": "omin sanoin..." }
     codeNotes: {},
   },
@@ -206,7 +211,7 @@ export function importCodeNotes(json, { merge = true } = {}) {
 
 export function exportCSV() {
   const rows = [
-    ["Pvm", "Vuoro", "Aika", "Koodi", "Tehtävä", "Hälytysaste", "Johtovastuu", "Kuljetus", "Kohde", "KuljKoodi", "KuljKiireellisyys", "Tagit", "RR", "Pulssi", "SpO2", "GCS", "Kuvaus"],
+    ["Pvm", "Vuoro", "Aika", "Koodi", "Tehtävä", "Hälytysaste", "Johtovastuu", "Kuljetus", "Kohde", "KuljKoodi", "KuljKiireellisyys", "Tagit", "RR", "Pulssi", "SpO2", "GCS", "Kuvaus", "Tapahtumaloki"],
   ];
   const calls = getAllCalls().sort((a, b) => {
     const da = a.shift.date + (a.time || "");
@@ -232,6 +237,7 @@ export function exportCSV() {
       c.vitals?.spo2 || "",
       c.vitals?.gcs || "",
       (c.description || "").replace(/\s+/g, " ").trim(),
+      (c.timeline || []).map((e) => `${e.t} ${e.label}`).join(" | "),
     ]);
   }
   return rows

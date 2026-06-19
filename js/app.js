@@ -110,6 +110,26 @@ function isTeho(dest) {
   return /teho/i.test(dest || "");
 }
 
+// Tapahtumaloki: yleiset aikaleimattavat tapahtumat (ei oppikirjasisältöä).
+const TIMELINE_EVENTS = [
+  "Potilas tavoitettu",
+  "Hoito aloitettu",
+  "Painelu alkoi",
+  "Rytmintarkistus",
+  "Defibrillointi",
+  "Adrenaliini",
+  "Lääke annettu",
+  "ROSC",
+  "Kuljetus alkoi",
+  "Luovutus",
+];
+function nowClock() { return new Date().toTimeString().slice(0, 8); }
+function timelineListHtml(items) {
+  if (!items.length) return `<p class="muted small">Ei tapahtumia. Napauta painiketta kirjataksesi aikaleiman juuri nyt.</p>`;
+  return `<div class="tl-rows">${items.map((e, i) =>
+    `<div class="tl-item"><span class="tl-time">${esc(e.t)}</span><span class="tl-label">${esc(e.label)}</span><button type="button" class="tl-del" data-i="${i}" aria-label="Poista">×</button></div>`).join("")}</div>`;
+}
+
 // X-koodin tarkennevalikon optiot (esim. X-4 -> X-41…X-45).
 function xSubOptions(disposition, selected) {
   const base = (disposition || "").split(" ")[0];
@@ -557,6 +577,7 @@ function callRow(shiftId, c) {
           ${c.disposition === "Kuljetettu" && c.transportCode ? `<span class="meta-pill">Kulj. ${esc(c.transportCode)}${c.transportUrgency ? " " + esc(c.transportUrgency) : ""}</span>` : ""}
           ${(c.tags || []).map((t) => `<span class="meta-pill tag">${esc(t)}</span>`).join("")}
           ${c.role ? `<span class="meta-pill role">${esc(c.role)}</span>` : ""}
+          ${(c.timeline || []).length ? `<span class="meta-pill tl">⏱ ${c.timeline.length} tapahtumaa</span>` : ""}
         </div>
       </div>
     </div>`;
@@ -627,12 +648,13 @@ function renderShiftSummary(id) {
             }
             const tagsLine = (c.tags || []).length ? `<div class="pv-rowtags">${(c.tags || []).map(esc).join(", ")}${c.role ? ` — ${esc(c.role)}` : ""}</div>` : (c.role ? `<div class="pv-rowtags">${esc(c.role)}</div>` : "");
             const refl = c.reflection ? `<div class="pv-rowrefl">💡 ${esc(c.reflection)}</div>` : "";
+            const tl = (c.timeline || []).length ? `<div class="pv-rowtl">⏱ ${c.timeline.map((e) => `${esc(e.t)} ${esc(e.label)}`).join(" · ")}</div>` : "";
             return `<tr>
               <td>${esc(c.time || "")}</td>
               <td>${esc(c.urgency || "")}</td>
               <td>${esc(c.code || "")}</td>
               <td>${esc(c.codeName || "")}</td>
-              <td>${esc(c.description || "")}${tagsLine}${refl}</td>
+              <td>${esc(c.description || "")}${tagsLine}${tl}${refl}</td>
               <td>${esc(vs)}</td>
               <td>${esc(disp)}</td>
             </tr>`;
@@ -652,6 +674,7 @@ function renderShiftSummary(id) {
 function openCallForm(shiftId, existing) {
   const settings = getSettings();
   const c = existing || { time: nowTime(), urgency: "", disposition: "" };
+  let timeline = (c.timeline || []).map((e) => ({ ...e }));
   // Sisäänrakennetut toimenpiteet + käyttäjän omat tagit
   const allTags = [...new Set([...PROCEDURES, ...(settings.tags || [])])];
   const isX = (c.disposition || "").startsWith("X-");
@@ -725,6 +748,16 @@ function openCallForm(shiftId, existing) {
         ${ROLES.map((r) => `<button type="button" data-r="${esc(r)}" class="${(c.role || "") === r ? "on" : ""}">${esc(r || "–")}</button>`).join("")}
       </div>
     </label>
+    <label>Tapahtumaloki – aikaleimat
+      <div class="tl-presets" id="c-tl-presets">
+        ${TIMELINE_EVENTS.map((e) => `<button type="button" class="tl-btn" data-ev="${esc(e)}">+ ${esc(e)}</button>`).join("")}
+      </div>
+      <div class="tl-add">
+        <input type="text" id="c-tl-custom" placeholder="Oma tapahtuma…">
+        <button type="button" class="btn-sm" id="c-tl-addbtn">Lisää nyt</button>
+      </div>
+      <div class="tl-list" id="c-tl-list">${timelineListHtml(timeline)}</div>
+    </label>
     <label>Peruselintoiminnot (vapaaehtoinen)
       <div class="vitals">
         <span><small>RR</small><input type="text" id="v-rr" inputmode="numeric" value="${esc(c.vitals?.rr || "")}" placeholder="120/80"></span>
@@ -768,6 +801,7 @@ function openCallForm(shiftId, existing) {
         role: document.querySelector("#c-role .on")?.dataset.r || "",
         reflection: val("c-reflect"),
         vitals: hasVitals ? vitals : null,
+        timeline: timeline.length ? timeline : null,
       };
       if (existing) updateCall(shiftId, existing.id, patch);
       else addCall(shiftId, patch);
@@ -847,6 +881,29 @@ function openCallForm(shiftId, existing) {
   document.querySelectorAll("#c-role button").forEach((b) => {
     b.onclick = () => document.querySelectorAll("#c-role button").forEach((x) => x.classList.toggle("on", x === b));
   });
+  // Tapahtumaloki
+  const tlList = document.getElementById("c-tl-list");
+  const renderTl = () => {
+    tlList.innerHTML = timelineListHtml(timeline);
+    tlList.querySelectorAll(".tl-del").forEach((b) => {
+      b.onclick = () => { timeline.splice(Number(b.dataset.i), 1); renderTl(); };
+    });
+  };
+  document.querySelectorAll("#c-tl-presets .tl-btn").forEach((b) => {
+    b.onclick = () => { timeline.push({ t: nowClock(), label: b.dataset.ev }); renderTl(); };
+  });
+  const tlAdd = () => {
+    const v = val("c-tl-custom").trim();
+    if (!v) return;
+    timeline.push({ t: nowClock(), label: v });
+    document.getElementById("c-tl-custom").value = "";
+    renderTl();
+  };
+  document.getElementById("c-tl-addbtn").onclick = tlAdd;
+  document.getElementById("c-tl-custom").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); tlAdd(); }
+  });
+  renderTl();
 }
 
 function codeHint(code) {
@@ -993,6 +1050,8 @@ function renderStats() {
       ${kpi(s.callsPerShift, "keikkaa / vuoro")}
     </div>
 
+    ${internshipHtml(s)}
+
     ${insightsHtml(s)}
 
     ${goalsSectionHtml(s)}
@@ -1068,6 +1127,48 @@ function renderStats() {
   if (toggle) toggle.querySelectorAll("button").forEach((b) => {
     b.onclick = () => { statsActivityMode = b.dataset.m; renderStats(); };
   });
+}
+
+// Harjoittelujakson edistyminen
+function internshipHtml(s) {
+  const st = getSettings();
+  const targetHours = Number(st.targetHours) || 0;
+  const targetShifts = Number(st.targetShifts) || 0;
+  const start = st.internshipStart, end = st.internshipEnd;
+  if (!targetHours && !targetShifts && !start && !end) return "";
+
+  const pct = (done, target) => (target > 0 ? Math.min(100, Math.round((done / target) * 100)) : 0);
+  const bars = [];
+  if (targetHours) bars.push({ lab: "Tunnit", done: s.hoursLogged, target: targetHours, unit: " h" });
+  if (targetShifts) bars.push({ lab: "Vuorot", done: s.shiftCount, target: targetShifts, unit: "" });
+
+  let dayInfo = "";
+  if (start && end) {
+    const t = new Date(today() + "T00:00:00");
+    const sd = new Date(start + "T00:00:00");
+    const ed = new Date(end + "T00:00:00");
+    const dayMs = 86400000;
+    const totalDays = Math.max(1, Math.round((ed - sd) / dayMs) + 1);
+    const elapsed = Math.min(totalDays, Math.max(0, Math.round((t - sd) / dayMs) + 1));
+    const left = Math.max(0, Math.round((ed - t) / dayMs));
+    const phase = t < sd ? "alkaa pian" : t > ed ? "päättynyt" : `${left} pv jäljellä`;
+    const dpct = Math.min(100, Math.round((elapsed / totalDays) * 100));
+    dayInfo = `<div class="goal">
+      <div class="goal-top"><span class="goal-name">Jakson aika</span><span class="goal-num">${formatDate(start)}–${formatDate(end)} · ${phase}</span></div>
+      <div class="bartrack"><div class="barfill" style="width:${dpct}%;background:#6366f1"></div></div>
+    </div>`;
+  }
+
+  const barRows = bars.map((b) => {
+    const p = pct(b.done, b.target);
+    const reached = b.done >= b.target;
+    return `<div class="goal">
+      <div class="goal-top"><span class="goal-name">${b.lab}</span><span class="goal-num ${reached ? "done" : ""}">${b.done}${b.unit} / ${b.target}${b.unit} · ${p} %</span></div>
+      <div class="bartrack"><div class="barfill" style="width:${p}%"></div></div>
+    </div>`;
+  }).join("");
+
+  return `<h2 class="block-h">🎓 Harjoittelujakso</h2><div class="goals">${barRows}${dayInfo}</div>`;
 }
 
 // Lyhyet havainnot ("insights") datasta.
@@ -1537,6 +1638,19 @@ function renderSettings() {
     </section>
 
     <section class="settings-block">
+      <h2>Harjoittelujakso</h2>
+      <p class="muted">Aseta jakson kesto ja tavoitteet. Edistyminen näkyy Tilastot-välilehdellä.</p>
+      <div class="row">
+        <label class="field">Alkaa<input type="date" id="set-istart" value="${esc(st.internshipStart || "")}"></label>
+        <label class="field">Päättyy<input type="date" id="set-iend" value="${esc(st.internshipEnd || "")}"></label>
+      </div>
+      <div class="row">
+        <label class="field">Tavoitetunnit<input type="number" id="set-thours" inputmode="numeric" min="0" value="${st.targetHours || ""}" placeholder="esim. 300"></label>
+        <label class="field">Tavoitevuorot<input type="number" id="set-tshifts" inputmode="numeric" min="0" value="${st.targetShifts || ""}" placeholder="esim. 20"></label>
+      </div>
+    </section>
+
+    <section class="settings-block">
       <h2>Osaamistavoitteet</h2>
       <p class="muted">Yksi per rivi muodossa <b>Toimenpide : määrä</b>. Edistyminen näkyy Tilastot-välilehdellä. Esim. "Intubaatio : 5".</p>
       <textarea id="set-goals" rows="4" placeholder="Intubaatio : 5&#10;Kardioversio : 3&#10;Synnytys : 1">${esc((st.goals || []).map((g) => `${g.tag} : ${g.target}`).join("\n"))}</textarea>
@@ -1602,6 +1716,10 @@ function renderSettings() {
       destinations: splitList(val("set-dest")),
       tags: splitList(val("set-tags")),
       goals: parseGoals(val("set-goals")),
+      internshipStart: val("set-istart"),
+      internshipEnd: val("set-iend"),
+      targetHours: Number(val("set-thours")) || 0,
+      targetShifts: Number(val("set-tshifts")) || 0,
       defaultStation: readCombo("set-defstation"),
       defaultUnit: readCombo("set-defunit"),
       defaultHt: val("set-defht") === "1",
