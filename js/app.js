@@ -697,6 +697,7 @@ function openCallForm(shiftId, existing) {
       <div class="code-note" id="c-note">${codeNoteHtml(c.code)}</div>
     </label>
     <p class="form-note">Voit tallentaa pelkän hälytyskoodin nyt ja täydentää loput myöhemmin.</p>
+    <div id="c-guide">${guidanceHtml(c.code)}</div>
     <label>Kuvaus
       <textarea id="c-desc" rows="3" placeholder="Lyhyt kuvaus keikasta (ei tunnistetietoja)">${esc(c.description || "")}</textarea>
       <div class="tips" id="c-tips">${tipsHtml(tipsFor(c.description))}</div>
@@ -846,6 +847,7 @@ function openCallForm(shiftId, existing) {
     document.getElementById("c-codehint").innerHTML = codeHint(code);
     document.getElementById("c-info").href = infoUrlForCode(code);
     document.getElementById("c-note").innerHTML = codeNoteHtml(code);
+    document.getElementById("c-guide").innerHTML = guidanceHtml(code);
     if (!tcodeEdited) tcodeEl.value = code;
   };
   document.getElementById("c-note").onclick = (e) => {
@@ -956,6 +958,86 @@ function renderNoteMarkdown(md) {
   }
   flushPara(); closeList();
   return out.join("");
+}
+
+// ---- Ohjerungot per tehtäväkoodi ----
+// HUOM: Itse laadittuja, yleisiä kliinisiä muistirunkoja (ei Ensihoito-oppaan
+// tekstiä, ei lääkeannoksia). Erottavat kiireellisen (A/B) ja vakaan (C/D)
+// tehtävän painopisteet. Käyttäjä täydentää omalla materiaalillaan.
+const GUIDE_BASE_AB = [
+  "Varmista oma ja työparin turvallisuus; hälytä lisäapu ajoissa",
+  "cABCDE: tunnista ja hoida henkeä uhkaavat löydökset heti",
+  "Jatkuva monitorointi ja ABCDE:n toistaminen",
+  "Ennakkoilmoitus ja kuljetus oikeaan hoitopaikkaan viiveettä",
+];
+const GUIDE_BASE_CD = [
+  "Systemaattinen tutkiminen ja peruselintoimintojen arvio",
+  "Esitiedot (SAMPLE) ja oireanalyysi (OPQRST)",
+  "Arvioi kuljetustarve ja oikea hoitolinja",
+  "Jos ei kuljeteta: selkeät jatko-ohjeet ja turvaverkko (milloin soitettava uudelleen)",
+];
+const GUIDE_CODE = {
+  "700": { focus: "Eloton", primary: "ab", ab: ["Aloita laadukas paineluelvytys mahdollisimman keskeytyksittä", "Defibrilloi iskettävä rytmi varhain", "Turvaa ilmatie ja hapetus, ventiloi", "Mieti ja hoida palautuvat syyt", "Kirjaa tapahtuma-ajat tapahtumalokiin"], cd: ["Tämä tehtävä on lähtökohtaisesti kiireellinen – toimi A/B-rungolla", "Elottomuuden toteaminen / elvytyksestä pidättäytyminen pysyväisohjeen mukaan"] },
+  "701": { focus: "Elvytys", primary: "ab", ab: ["Laadukas painelu–puhallus, minimoi tauot", "Defibrillaatio iskettävälle rytmille", "Ilmatien hallinta ja hapetus", "Hoida palautuvat syyt; harkitse syyn mukaista hoitoa", "Kirjaa ajat tapahtumalokiin (rytmintarkistus, defib, lääke, ROSC)"], cd: ["Lähtökohtaisesti kiireellinen – käytä A/B-runkoa"] },
+  "702": { focus: "Tajuttomuus", primary: "ab", ab: ["Turvaa ilmatie (asento ja apuvälineet)", "Hapetus ja ventilaation tuki tarvittaessa", "Mittaa verensokeri", "Arvioi GCS, pupillat ja puolierot", "Etsi syytä (mm. happivaje, matala sokeri, myrkytys, AVH)"], cd: ["Seuraa tajunnan tasoa toistuvasti", ...GUIDE_BASE_CD] },
+  "703": { focus: "Hengitysvaikeus", primary: "ab", ab: ["Tue happeutumista tavoitesaturaatioon", "Arvioi hengitystyö, -taajuus ja hengitysäänet", "Asentohoito (puoli-istuva)", "Harkitse CPAP / ventilaation tuki pysyväisohjeen mukaan"], cd: ["Selvitä taustasairaus ja lääkitys", ...GUIDE_BASE_CD] },
+  "704": { focus: "Rintakipu", primary: "ab", ab: ["Ota 12-kanavainen EKG varhain ja toista tarvittaessa", "Jatkuva rytmiseuranta, defibrillaatiovalmius", "Hoida pysyväisohjeen mukaan", "Ennakkoilmoitus tarvittaessa (PCI-valmius)"], cd: ["Kivun luonne (OPQRST) ja riskitekijät", "12-EKG myös vakaalla", ...GUIDE_BASE_CD] },
+  "705": { focus: "Rytmihäiriö", primary: "ab", ab: ["12-kanavainen EKG ja jatkuva monitorointi", "Arvioi vakaus vs. epävakaus", "Kardioversio- / tahdistusvalmius epävakaalla", "Hoito pysyväisohjeen tai konsultaation mukaan"], cd: ["Dokumentoi rytmi ja oireet (EKG)", ...GUIDE_BASE_CD] },
+  "706": { focus: "Aivoverenkiertohäiriö", primary: "ab", ab: ["Tunnista oireet (esim. FAST) ja oireiden tarkka alkamisaika", "Mittaa verensokeri", "Pre-alert ja kuljetus AVH-yksikköön viiveettä", "Vältä turhia viiveitä kohteessa"], cd: ["Kirjaa oireiden alku ja kulku tarkasti", ...GUIDE_BASE_CD] },
+  "711": { focus: "Ilmatie-este", primary: "ab", ab: ["Avaa ja turvaa ilmatie", "Poista este hallitusti, hapetus", "Varaudu ventilaatioon / kajoavaan ilmatiehen"], cd: GUIDE_BASE_CD },
+  "713": { focus: "Hirttäytyminen / kuristuminen", primary: "ab", ab: ["Turvaa ilmatie ja hapetus", "Huomioi kaularangan mahdollinen vamma", "Seuraa tajuntaa ja hengitystä"], cd: GUIDE_BASE_CD },
+  "714": { focus: "Hukkuminen", primary: "ab", ab: ["Turvaa ilmatie ja hapetus, varaudu elvytykseen", "Estä jäähtyminen, mittaa lämpö", "Seuraa hengitystä ja tajuntaa"], cd: GUIDE_BASE_CD },
+  "771": { focus: "Sokeritasapainon häiriö", primary: "ab", ab: ["Mittaa verensokeri", "Hoida pysyväisohjeen mukaan", "Arvioi tajunta ja nielemiskyky ennen suun kautta annettavaa"], cd: ["Selvitä syy (lääkitys, ruokailu, sairaus)", ...GUIDE_BASE_CD] },
+  "772": { focus: "Kouristelu", primary: "ab", ab: ["Turvaa ilmatie ja estä lisävammat", "Mittaa verensokeri", "Kirjaa kesto ja toistuvuus; hoito pysyväisohjeen mukaan"], cd: ["Toipumisen seuranta, syiden kartoitus", ...GUIDE_BASE_CD] },
+  "773": { focus: "Yliherkkyysreaktio", primary: "ab", ab: ["Tunnista anafylaksia (hengitys ja verenkierto)", "Poista altiste", "Hoida pysyväisohjeen mukaan viiveettä"], cd: ["Lievässä reaktiossa seuranta ja jatko-ohjeet", ...GUIDE_BASE_CD] },
+  "791": { focus: "Synnytys", primary: "ab", ab: ["Arvioi synnytyksen vaihe ja ehtiikö sairaalaan", "Valmistaudu äidin ja vauvan hoitoon", "Vastasyntyneen lämpötalous, hengitys ja virkeys"], cd: ["Säännölliset supistukset: arvioi kuljetus ajoissa", ...GUIDE_BASE_CD] },
+  "796": { focus: "Monipotilastilanne", primary: "ab", ab: ["Tee tilannearvio ja triage", "Johtaminen, työnjako ja lisäresurssit", "Raportointi ja potilaiden priorisointi"], cd: ["Pienemmässä tilanteessa systemaattinen priorisointi", ...GUIDE_BASE_CD] },
+  "785": { focus: "Mielenterveysongelma", primary: "cd", ab: ["Jos peruselintoiminnot uhattuna tai välitön vaara, siirry A/B-runkoon", "Oma turvallisuus; yhteistyö poliisin kanssa tarvittaessa"], cd: ["Arvioi itsetuhoisuus ja väkivaltariski", "Sulje pois somaattiset syyt", "Rauhallinen kohtaaminen, hoitopaikan ja -linjan valinta"] },
+};
+const GUIDE_PREFIX = {
+  trauma: { focus: "Vamma", primary: "ab", ab: ["Hallitse henkeä uhkaava ulkoinen verenvuoto (paine- / kiristysside)", "cABCDE ja vammojen kartoitus", "Tue ranka ja immobilisoi tarvittaessa", "Estä jäähtyminen; kuljetus oikeaan traumayksikköön"], cd: ["Paikallinen vamma: tutki, tue ja arvioi toimintakyky", ...GUIDE_BASE_CD] },
+  expo: { focus: "Onnettomuus / altistuminen", primary: "ab", ab: ["Oma turvallisuus ja altisteen tunnistus ensin", "Lopeta altistuminen turvallisesti", "ABCDE; palovammassa jäähdytä ja suojaa, estä jäähtyminen", "Myrkytyksessä selvitä aine, määrä ja altistusaika"], cd: ["Lievä altistus: seuranta ja jatko-ohjeet", ...GUIDE_BASE_CD] },
+  bleed: { focus: "Verenvuoto", primary: "ab", ab: ["Arvioi vuodon määrä ja hemodynamiikka", "Tyrehdytä ulkoinen vuoto", "Varaudu sokin tunnistukseen ja hoitoon"], cd: ["Vähäinen vuoto: paikallishoito ja seuranta", ...GUIDE_BASE_CD] },
+  symptom: { focus: "Kipuoire", primary: "cd", ab: ["Jos peruselintoiminnot uhattuna, siirry A/B-runkoon"], cd: ["Oireanalyysi (OPQRST) ja systemaattinen tutkiminen", "Tunnista hälyttävät löydökset (punaiset liput)", "Kivunhoito pysyväisohjeen mukaan", "Kuljetustarve ja oikea hoitopaikka"] },
+};
+const GUIDE_GROUP = {
+  x: { focus: "Ei kuljetusta", primary: "cd", ab: ["Varmista, ettei jää henkeä uhkaavaa tilaa", "Konsultoi / pyydä hoito-ohje tarvittaessa"], cd: ["Dokumentoi tutkiminen ja päätöksen perustelu", "Anna selkeät jatko-ohjeet ja turvaverkko", "Varmista potilaan suostumus ja ymmärrys", "Kirjaa konsultaatio ja hoito-ohje"] },
+  pel: { focus: "Pelastusjohtoinen", primary: "ab", ab: ["Oma turvallisuus ja työnjako viranomaisten kesken", "Potilaiden triage ja ensihoidon priorisointi", "Tilannekuva ja raportointi johdolle"], cd: ["Pienemmässä tilanteessa systemaattinen arvio", ...GUIDE_BASE_CD] },
+  pol: { focus: "Poliisijohtoinen", primary: "ab", ab: ["Oma turvallisuus ensin; toimi vasta kun kohde on poliisin turvaama", "cABCDE ja ulkoisen vuodon hallinta", "Dokumentoi löydökset huolellisesti"], cd: ["Vakaa potilas: systemaattinen arvio ja jatko", ...GUIDE_BASE_CD] },
+};
+function codeGuidance(code) {
+  code = (code || "").toUpperCase();
+  const info = CODE_MAP.get(code);
+  if (!info) return null;
+  let spec = GUIDE_CODE[code];
+  if (!spec) {
+    if (/^74/.test(code)) spec = GUIDE_PREFIX.trauma;
+    else if (/^75/.test(code)) spec = GUIDE_PREFIX.expo;
+    else if (/^76/.test(code)) spec = GUIDE_PREFIX.bleed;
+    else if (/^78/.test(code)) spec = GUIDE_PREFIX.symptom;
+  }
+  if (!spec) spec = GUIDE_GROUP[info.groupId];
+  const ab = (spec?.ab?.length ? spec.ab : GUIDE_BASE_AB).slice(0, 6);
+  const cd = (spec?.cd?.length ? spec.cd : GUIDE_BASE_CD).slice(0, 6);
+  return { ab, cd, focus: spec?.focus || info.name, primary: spec?.primary || "ab" };
+}
+function guidanceHtml(code) {
+  const g = codeGuidance((code || "").toUpperCase());
+  if (!g) return "";
+  const list = (arr) => `<ul class="g-list">${arr.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`;
+  return `<details class="guidance"${g ? "" : ""}>
+    <summary>🧭 Ohjerunko – mitä huomioida (A/B vs C/D)</summary>
+    <div class="g-body">
+      <div class="g-tier g-ab"><h4>A / B · kiireellinen, korkeariskinen</h4>${list(g.ab)}</div>
+      <div class="g-tier g-cd"><h4>C / D · vakaa, kiireetön</h4>${list(g.cd)}</div>
+      <p class="g-note">Yleinen muistirunko – täydennä omalla materiaalillasi (annokset ja paikalliset hoito-ohjeet). Ei korvaa virallista ohjetta.</p>
+    </div>
+  </details>`;
+}
+function guidanceMarkdown(code) {
+  const g = codeGuidance((code || "").toUpperCase());
+  if (!g) return "";
+  return `## A/B – kiireellinen\n${g.ab.map((x) => `- ${x}`).join("\n")}\n\n## C/D – vakaa\n${g.cd.map((x) => `- ${x}`).join("\n")}\n`;
 }
 
 function codeNoteHtml(code) {
@@ -1358,9 +1440,11 @@ function openCodeNote(code, after) {
   openModal(`${code}${info ? " · " + info.name : ""}`, `
     ${info ? `<p class="muted">${esc(info.lead)} · ${esc(info.category)}</p>` : ""}
     <a class="info-link" href="${infoUrlForCode(code)}" target="_blank" rel="noopener">ⓘ Avaa virallinen lisätieto (ensihoito-online.fi)</a>
+    ${guidanceHtml(code)}
     <label style="margin-top:12px">Hoito-ohje / muistiinpano
       <textarea id="cn-text" rows="10" placeholder="Kirjoita tai liitä omat muistilistasi / hoito-ohjeesi tästä tehtävästä.">${esc(note)}</textarea>
     </label>
+    <button type="button" class="btn-sm ghost" id="cn-tpl">＋ Lisää ohjerunko pohjaksi</button>
     <p class="cn-help">Muotoilu: <code># Otsikko</code> · <code>**lihavointi**</code> · <code>- lista</code> · <code>[linkki](url)</code> · <code>![kuva](url)</code></p>
     <div class="cn-prev-wrap">
       <div class="cn-prev-lab">Esikatselu</div>
@@ -1376,12 +1460,19 @@ function openCodeNote(code, after) {
   });
   const ta = document.getElementById("cn-text");
   const prev = document.getElementById("cn-prev");
-  if (ta && prev) {
-    ta.addEventListener("input", () => {
-      const v = ta.value.trim();
-      prev.innerHTML = v ? renderNoteMarkdown(v) : '<p class="muted">Esikatselu näkyy tässä kun kirjoitat…</p>';
-    });
-  }
+  const refreshPrev = () => {
+    const v = ta.value.trim();
+    prev.innerHTML = v ? renderNoteMarkdown(v) : '<p class="muted">Esikatselu näkyy tässä kun kirjoitat…</p>';
+  };
+  if (ta && prev) ta.addEventListener("input", refreshPrev);
+  const tplBtn = document.getElementById("cn-tpl");
+  if (tplBtn) tplBtn.onclick = () => {
+    const tpl = guidanceMarkdown(code);
+    if (!tpl) return;
+    ta.value = ta.value.trim() ? ta.value.replace(/\s*$/, "") + "\n\n" + tpl : tpl;
+    refreshPrev();
+    ta.focus();
+  };
 }
 
 // Yleisesti opetetut kliiniset muistilistat (ei Ensihoito-oppaasta kopioitua sisältöä).
