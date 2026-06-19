@@ -854,12 +854,59 @@ function codeHint(code) {
   if (!info) return "";
   return `<span class="lead-tag" style="--lc:${info.color}">${info.lead}</span> ${esc(info.name)} · <span class="muted">${esc(info.category)}</span>`;
 }
+// Kevyt, turvallinen Markdown-muotoilu omille muistiinpanoille.
+// Tukee: # otsikot, **lihavointi**, *kursiivi*, - / 1. listat, [linkki](url),
+// ![kuva](url) ja `koodi`. Teksti escapetataan AINA ennen muotoilua.
+function mdInline(s) {
+  // s on jo HTML-escapattu
+  s = s.replace(/!\[([^\]]*)\]\((https?:[^)\s]+)\)/g, (_m, alt, url) => `<img class="cn-img" src="${url}" alt="${alt}" loading="lazy">`);
+  s = s.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, (_m, t, url) => `<a href="${url}" target="_blank" rel="noopener">${t}</a>`);
+  s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/(^|[\s(>])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+  s = s.replace(/(^|[\s(>])_([^_\n]+)_/g, "$1<em>$2</em>");
+  s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
+  return s;
+}
+function renderNoteMarkdown(md) {
+  const lines = String(md || "").replace(/\r\n/g, "\n").split("\n");
+  const out = [];
+  let listType = null;
+  const closeList = () => { if (listType) { out.push(`</${listType}>`); listType = null; } };
+  let para = [];
+  const flushPara = () => { if (para.length) { out.push(`<p>${mdInline(esc(para.join(" ")))}</p>`); para = []; } };
+  for (const raw of lines) {
+    const line = raw.replace(/\s+$/, "");
+    if (!line.trim()) { flushPara(); closeList(); continue; }
+    let m;
+    if ((m = line.match(/^(#{1,4})\s+(.*)$/))) {
+      flushPara(); closeList();
+      const lvl = Math.min(m[1].length + 2, 6);
+      out.push(`<h${lvl} class="cn-h">${mdInline(esc(m[2]))}</h${lvl}>`);
+    } else if ((m = line.match(/^!\[([^\]]*)\]\((https?:[^)\s]+)\)\s*$/))) {
+      flushPara(); closeList();
+      out.push(`<img class="cn-img" src="${esc(m[2])}" alt="${esc(m[1])}" loading="lazy">`);
+    } else if ((m = line.match(/^[-*•]\s+(.*)$/))) {
+      flushPara();
+      if (listType !== "ul") { closeList(); out.push('<ul class="cn-ul">'); listType = "ul"; }
+      out.push(`<li>${mdInline(esc(m[1]))}</li>`);
+    } else if ((m = line.match(/^\d+[.)]\s+(.*)$/))) {
+      flushPara();
+      if (listType !== "ol") { closeList(); out.push('<ol class="cn-ol">'); listType = "ol"; }
+      out.push(`<li>${mdInline(esc(m[1]))}</li>`);
+    } else {
+      para.push(line.trim());
+    }
+  }
+  flushPara(); closeList();
+  return out.join("");
+}
+
 function codeNoteHtml(code) {
   code = (code || "").toUpperCase();
   if (!CODE_MAP.get(code)) return "";
   const note = getCodeNote(code);
-  if (note) return `<div class="cn-show">📝 ${esc(note).replace(/\n/g, "<br>")} <a href="#" data-editnote="${esc(code)}">muokkaa</a></div>`;
-  return `<a href="#" class="cn-add" data-editnote="${esc(code)}">+ Lisää oma muistiinpano tälle koodille</a>`;
+  if (note) return `<div class="cn-show cn-rich">${renderNoteMarkdown(note)}<a href="#" class="cn-edit" data-editnote="${esc(code)}">✎ muokkaa</a></div>`;
+  return `<a href="#" class="cn-add" data-editnote="${esc(code)}">+ Lisää hoito-ohje / muistiinpano</a>`;
 }
 
 // ---------- Kaikki keikat (haku + suodatus) ----------
@@ -1054,10 +1101,15 @@ function openCodeNote(code, after) {
   openModal(`${code}${info ? " · " + info.name : ""}`, `
     ${info ? `<p class="muted">${esc(info.lead)} · ${esc(info.category)}</p>` : ""}
     <a class="info-link" href="${infoUrlForCode(code)}" target="_blank" rel="noopener">ⓘ Avaa virallinen lisätieto (ensihoito-online.fi)</a>
-    <label style="margin-top:12px">Omat muistiinpanot (omin sanoin)
-      <textarea id="cn-text" rows="8" placeholder="Kirjoita omat muistilistasi tästä tehtävästä – omin sanoin.">${esc(note)}</textarea>
+    <label style="margin-top:12px">Hoito-ohje / muistiinpano
+      <textarea id="cn-text" rows="10" placeholder="Kirjoita tai liitä omat muistilistasi / hoito-ohjeesi tästä tehtävästä.">${esc(note)}</textarea>
     </label>
-    <p class="form-note">Tallentuu vain tähän laitteeseen. Kirjoita omin sanoin – älä kopioi oppikirjan tekstiä sellaisenaan.</p>
+    <p class="cn-help">Muotoilu: <code># Otsikko</code> · <code>**lihavointi**</code> · <code>- lista</code> · <code>[linkki](url)</code> · <code>![kuva](url)</code></p>
+    <div class="cn-prev-wrap">
+      <div class="cn-prev-lab">Esikatselu</div>
+      <div class="cn-rich" id="cn-prev">${note ? renderNoteMarkdown(note) : '<p class="muted">Esikatselu näkyy tässä kun kirjoitat…</p>'}</div>
+    </div>
+    <p class="form-note">Tallentuu vain tähän laitteeseen (ei julkiseen versionhallintaan). Voit liittää tähän oman materiaalisi.</p>
   `, {
     onSave: () => {
       setCodeNote(code, val("cn-text"));
@@ -1065,6 +1117,14 @@ function openCodeNote(code, after) {
       if (after) after();
     },
   });
+  const ta = document.getElementById("cn-text");
+  const prev = document.getElementById("cn-prev");
+  if (ta && prev) {
+    ta.addEventListener("input", () => {
+      const v = ta.value.trim();
+      prev.innerHTML = v ? renderNoteMarkdown(v) : '<p class="muted">Esikatselu näkyy tässä kun kirjoitat…</p>';
+    });
+  }
 }
 
 // Yleisesti opetetut kliiniset muistilistat (ei Ensihoito-oppaasta kopioitua sisältöä).

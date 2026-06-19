@@ -261,9 +261,30 @@ a { color: inherit; text-decoration: none; }
 .coderow-go { margin-left: auto; color: var(--muted); font-weight: 700; font-size: 1.2rem; }
 .coderow-note { color: var(--primary); }
 .code-note { margin-top: 8px; }
-.cn-show { background: color-mix(in srgb, var(--primary) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border)); border-radius: var(--radius-sm); padding: 10px 12px; font-size: .9rem; }
+.cn-show { background: color-mix(in srgb, var(--primary) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border)); border-radius: var(--radius-sm); padding: 12px 14px; font-size: .9rem; border-left: 3px solid var(--primary); }
 .cn-show a, .cn-add { color: var(--primary); font-weight: 700; }
 .cn-add { display: inline-block; font-size: .85rem; }
+.cn-edit { display: inline-block; margin-top: 8px; font-size: .82rem; }
+
+/* Rikas muistiinpano (Markdown) */
+.cn-rich { line-height: 1.55; }
+.cn-rich > :first-child { margin-top: 0; }
+.cn-rich .cn-h { margin: 12px 0 5px; color: var(--primary); letter-spacing: -.01em; line-height: 1.25; }
+.cn-rich h3.cn-h { font-size: 1.04rem; }
+.cn-rich h4.cn-h { font-size: .98rem; }
+.cn-rich h5.cn-h, .cn-rich h6.cn-h { font-size: .92rem; color: var(--text); }
+.cn-rich p { margin: 6px 0; }
+.cn-rich ul.cn-ul, .cn-rich ol.cn-ol { margin: 6px 0; padding-left: 20px; }
+.cn-rich li { margin: 3px 0; }
+.cn-rich li::marker { color: var(--primary); }
+.cn-rich strong { font-weight: 800; }
+.cn-rich a { color: var(--primary); font-weight: 600; word-break: break-word; }
+.cn-rich code { background: var(--surface-2); padding: 1px 6px; border-radius: 6px; font-size: .85em; }
+.cn-img { max-width: 100%; height: auto; display: block; margin: 10px 0; border-radius: 10px; border: 1px solid var(--border); }
+.cn-help { font-size: .76rem; color: var(--muted); margin: 8px 0 0; line-height: 1.7; }
+.cn-help code { background: var(--surface-2); padding: 1px 6px; border-radius: 6px; }
+.cn-prev-wrap { margin-top: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; background: var(--surface-2); }
+.cn-prev-lab { font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 800; margin-bottom: 6px; }
 
 /* ---------- Calendar ---------- */
 .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
