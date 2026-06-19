@@ -7,6 +7,7 @@ import {
   exportCodeNotes, importCodeNotes,
 } from "./storage.js";
 import { CODE_GROUPS, CODE_MAP, ALL_CODES, URGENCY, PROCEDURES, X_SUBCODES } from "./codes.js";
+import { codeInfo } from "./codeinfo.js";
 import { computeStats, shiftHours, DAYPARTS, WEEKDAYS } from "./stats.js";
 import { STATIONS, stationLabel, ALL_UNITS, findStation, stationColor, DEFAULT_ACCENT, unitLevel } from "./stations.js";
 
@@ -1022,22 +1023,37 @@ function codeGuidance(code) {
   return { ab, cd, focus: spec?.focus || info.name, primary: spec?.primary || "ab" };
 }
 function guidanceHtml(code) {
-  const g = codeGuidance((code || "").toUpperCase());
+  code = (code || "").toUpperCase();
+  const g = codeGuidance(code);
   if (!g) return "";
+  const info = codeInfo(code);
   const list = (arr) => `<ul class="g-list">${arr.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`;
-  return `<details class="guidance"${g ? "" : ""}>
-    <summary>🧭 Ohjerunko – mitä huomioida (A/B vs C/D)</summary>
+  const infoBlock = info ? `
+      ${info.what ? `<p class="g-what">${esc(info.what)}</p>` : ""}
+      ${info.assess?.length ? `<div class="g-sec"><h4>Keskeinen arvio</h4>${list(info.assess)}</div>` : ""}
+      ${info.actions?.length ? `<div class="g-sec"><h4>Hoidon painopisteet</h4>${list(info.actions)}</div>` : ""}
+      ${info.red?.length ? `<div class="g-sec g-redflags"><h4>⚠️ Hälyttävät löydökset</h4>${list(info.red)}</div>` : ""}` : "";
+  return `<details class="guidance">
+    <summary>🧭 Tietoa tehtävästä & ohjerunko (A/B vs C/D)</summary>
     <div class="g-body">
+      ${infoBlock}
       <div class="g-tier g-ab"><h4>A / B · kiireellinen, korkeariskinen</h4>${list(g.ab)}</div>
       <div class="g-tier g-cd"><h4>C / D · vakaa, kiireetön</h4>${list(g.cd)}</div>
-      <p class="g-note">Yleinen muistirunko – täydennä omalla materiaalillasi (annokset ja paikalliset hoito-ohjeet). Ei korvaa virallista ohjetta.</p>
+      <p class="g-note">Yleistä, itse koostettua ensihoidon tietoa (lähteinä mm. StatPearls, ERC, AHA/ASA, WHO). Täydennä omalla materiaalillasi ja noudata alueellista hoito-ohjetta. Ei lääkeannoksia – ei korvaa virallista ohjetta.</p>
     </div>
   </details>`;
 }
 function guidanceMarkdown(code) {
-  const g = codeGuidance((code || "").toUpperCase());
+  code = (code || "").toUpperCase();
+  const g = codeGuidance(code);
   if (!g) return "";
-  return `## A/B – kiireellinen\n${g.ab.map((x) => `- ${x}`).join("\n")}\n\n## C/D – vakaa\n${g.cd.map((x) => `- ${x}`).join("\n")}\n`;
+  const info = codeInfo(code);
+  const sec = (title, arr) => arr?.length ? `### ${title}\n${arr.map((x) => `- ${x}`).join("\n")}\n\n` : "";
+  let md = "";
+  if (info?.what) md += `${info.what}\n\n`;
+  if (info) { md += sec("Keskeinen arvio", info.assess); md += sec("Hoidon painopisteet", info.actions); md += sec("Hälyttävät löydökset", info.red); }
+  md += `## A/B – kiireellinen\n${g.ab.map((x) => `- ${x}`).join("\n")}\n\n## C/D – vakaa\n${g.cd.map((x) => `- ${x}`).join("\n")}\n`;
+  return md;
 }
 
 function codeNoteHtml(code) {
