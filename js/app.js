@@ -7,7 +7,7 @@ import {
   exportCodeNotes, importCodeNotes,
 } from "./storage.js";
 import { CODE_GROUPS, CODE_MAP, ALL_CODES, URGENCY, PROCEDURES, X_SUBCODES } from "./codes.js";
-import { computeStats, shiftHours } from "./stats.js";
+import { computeStats, shiftHours, DAYPARTS, WEEKDAYS } from "./stats.js";
 import { STATIONS, stationLabel, ALL_UNITS, findStation, stationColor, DEFAULT_ACCENT, unitLevel } from "./stations.js";
 
 // ---------- Lista + oma syöte -valitsimet (asema / yksikkö) ----------
@@ -967,6 +967,7 @@ function renderCalls() {
 }
 
 // ---------- Tilastot ----------
+let statsActivityMode = "day"; // "day" | "week"
 function renderStats() {
   const s = computeStats();
   if (s.callCount === 0) {
@@ -979,20 +980,47 @@ function renderStats() {
       </div>`;
     return;
   }
-  const maxLead = Math.max(1, ...Object.values(s.byLead));
-  const maxUrg = Math.max(1, ...["A", "B", "C", "D"].map((x) => s.byUrgency[x] || 0));
+  const urgSegments = ["A", "B", "C", "D"].map((k) => ({ label: k, value: s.byUrgency[k] || 0, color: URGENCY[k].color }));
+  const leadSegments = Object.entries(s.byLead).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: k, value: v, color: leadColor(k) }));
+
   app.innerHTML = `
     <header class="page-head"><h1>Tilastot</h1></header>
 
-    <div class="kpis">
+    <div class="kpis kpis-4">
       ${kpi(s.shiftCount, "vuoroa")}
       ${kpi(s.callCount, "keikkaa")}
-      ${kpi(s.hoursLogged + " h", "kirjattu")}
+      ${kpi(s.hoursLogged + " h", "tuntia")}
+      ${kpi(s.callsPerShift, "keikkaa / vuoro")}
     </div>
+
+    ${insightsHtml(s)}
 
     ${goalsSectionHtml(s)}
 
-    <h2 class="block-h">Kuljetus</h2>
+    <h2 class="block-h">📈 Aktiivisuus ajan myötä</h2>
+    <div class="seg toggle-seg" id="act-toggle">
+      <button type="button" data-m="day" class="${statsActivityMode === "day" ? "on" : ""}">Päivittäin</button>
+      <button type="button" data-m="week" class="${statsActivityMode === "week" ? "on" : ""}">Viikoittain</button>
+    </div>
+    <div class="card chart-card">${activityChartHtml(s)}</div>
+
+    <h2 class="block-h">🕐 Keikat kellonajoittain</h2>
+    <div class="card chart-card">
+      ${hourHistHtml(s.hourHist, "var(--primary)")}
+      ${s.untimedCalls ? `<p class="muted small">${s.untimedCalls} keikkaa ilman kellonaikaa ei näy tässä.</p>` : ""}
+    </div>
+
+    <h2 class="block-h">🌗 Vuorokaudenaika × kiireellisyys</h2>
+    <p class="muted small">Mihin aikaan tulee minkä kiireellisyyden ja tyyppisiä hälytyksiä.</p>
+    <div class="card">${daypartHtml(s.dayparts)}</div>
+
+    <h2 class="block-h">📅 Viikonpäivät</h2>
+    <div class="card chart-card">${weekdayHtml(s.weekdayHist)}</div>
+
+    <h2 class="block-h">☀️ Päivä- vs. 🌙 yövuoro</h2>
+    <div class="cmp-grid">${shiftTypeHtml(s)}</div>
+
+    <h2 class="block-h">🚑 Kuljetus</h2>
     <div class="ring-wrap">
       <div class="ring" style="--p:${s.transportRate}"><span>${s.transportRate}%</span></div>
       <div class="ring-info">
@@ -1001,22 +1029,18 @@ function renderStats() {
       </div>
     </div>
 
-    <h2 class="block-h">Hälytysasteet</h2>
-    <div class="bars">
-      ${["A", "B", "C", "D"].map((k) => bar(k, s.byUrgency[k] || 0, maxUrg, URGENCY[k].color)).join("")}
-    </div>
+    <h2 class="block-h">🎯 Hälytysasteet</h2>
+    <div class="card">${donutHtml(urgSegments, { center: s.callCount, sub: "keikkaa" })}</div>
 
-    <h2 class="block-h">Johtovastuu</h2>
-    <div class="bars">
-      ${Object.entries(s.byLead).sort((a, b) => b[1] - a[1]).map(([k, v]) => bar(k, v, maxLead, leadColor(k))).join("") || `<p class="muted">Ei dataa.</p>`}
-    </div>
+    <h2 class="block-h">🛡️ Johtovastuu</h2>
+    <div class="card">${leadSegments.length ? donutHtml(leadSegments, { center: s.callCount, sub: "keikkaa" }) : `<p class="muted">Ei dataa.</p>`}</div>
 
-    <h2 class="block-h">Hälytys → kuljetus</h2>
+    <h2 class="block-h">🔁 Hälytys → kuljetus</h2>
     ${s.compare.total ? `
       <div class="kpis">
         ${kpi(s.compare.changeRate + " %", "kiireellisyys muuttui")}
-        ${kpi(s.compare.urgDown, "laski (B→C)")}
-        ${kpi(s.compare.urgUp, "nousi (C→B)")}
+        ${kpi(s.compare.urgDown, "laski (esim. B→C)")}
+        ${kpi(s.compare.urgUp, "nousi (esim. C→B)")}
       </div>
       <p class="muted" style="margin-top:10px">${s.compare.urgSame}/${s.compare.total} kuljetuksessa kiireellisyys pysyi samana · koodi muuttui ${s.compare.codeChanged} kertaa</p>
       ${s.compare.topTransitions.length ? `<div class="list compact" style="margin-top:10px">
@@ -1024,21 +1048,153 @@ function renderStats() {
       </div>` : ""}
     ` : `<p class="muted">Ei vielä kuljetuksia, joissa sekä hälytys- että kuljetusaste on kirjattu.</p>`}
 
-    <h2 class="block-h">Yleisimmät tehtäväkoodit</h2>
+    <h2 class="block-h">🏷️ Yleisimmät tehtäväkoodit</h2>
     <div class="list compact">
       ${s.topCodes.length ? s.topCodes.map((c) => `<div class="ranked"><span class="code">${esc(c.code)}</span> <span class="cname">${esc(c.name)}</span><span class="rcount">${c.n}</span></div>`).join("") : `<p class="muted">Ei dataa.</p>`}
     </div>
 
-    <h2 class="block-h">Kuljetuskohteet</h2>
+    <h2 class="block-h">📍 Kuljetuskohteet</h2>
     <div class="list compact">
       ${s.topDest.length ? s.topDest.map(([d, n]) => `<div class="ranked"><span class="cname">${esc(d)}</span><span class="rcount">${n}</span></div>`).join("") : `<p class="muted">Ei kuljetuksia.</p>`}
     </div>
 
-    <h2 class="block-h">Merkittävät tapaukset / toimenpiteet</h2>
+    <h2 class="block-h">⭐ Merkittävät tapaukset / toimenpiteet</h2>
     <div class="list compact">
       ${s.topTags.length ? s.topTags.map(([t, n]) => `<div class="ranked"><span class="cname">${esc(t)}</span><span class="rcount">${n}</span></div>`).join("") : `<p class="muted">Ei merkintöjä vielä.</p>`}
     </div>
   `;
+
+  const toggle = document.getElementById("act-toggle");
+  if (toggle) toggle.querySelectorAll("button").forEach((b) => {
+    b.onclick = () => { statsActivityMode = b.dataset.m; renderStats(); };
+  });
+}
+
+// Lyhyet havainnot ("insights") datasta.
+function insightsHtml(s) {
+  const items = [];
+  if (s.peakHour != null) items.push(`Vilkkain kellonaika: <b>klo ${s.peakHour}–${(s.peakHour + 1) % 24}</b>`);
+  if (s.busiestDaypart) items.push(`Vilkkain vuorokaudenaika: <b>${s.busiestDaypart.label} (${s.busiestDaypart.short})</b>`);
+  if (s.peakWeekdayIdx != null) items.push(`Vilkkain viikonpäivä: <b>${WEEKDAYS[s.peakWeekdayIdx]}</b>`);
+  const ds = s.shiftTypeCalls.day, ns = s.shiftTypeCalls.night;
+  if (ds || ns) items.push(ns > ds ? `Yövuoroissa enemmän keikkoja (${ns} vs ${ds})` : ds > ns ? `Päivävuoroissa enemmän keikkoja (${ds} vs ${ns})` : `Päivä- ja yövuorot yhtä vilkkaita`);
+  if (s.distinctCodes) items.push(`Eri tehtäväkoodeja: <b>${s.distinctCodes}</b>`);
+  if (!items.length) return "";
+  return `<div class="insights">${items.map((t) => `<div class="insight">💡 ${t}</div>`).join("")}</div>`;
+}
+
+// Päivä/viikko -pylväskaavio
+function activityChartHtml(s) {
+  if (statsActivityMode === "week") {
+    const items = s.weeklySeries.map((w) => ({ label: w.label, value: w.count, sub: w.hours + " h" }));
+    return columnsHtml(items, { color: "var(--primary)", emptyText: "Ei viikkodataa." });
+  }
+  const items = s.dailySeries.map((d) => ({ label: shortDate(d.date), value: d.count, sub: d.hours + " h" }));
+  return columnsHtml(items, { color: "var(--primary)", emptyText: "Ei päivädataa." });
+}
+
+// Pystypylväät (HTML/CSS), arvo päällä ja otsikko alla.
+function columnsHtml(items, { color, max, emptyText }) {
+  if (!items || !items.length) return `<p class="muted">${esc(emptyText || "Ei dataa.")}</p>`;
+  const mx = max || Math.max(1, ...items.map((i) => i.value));
+  return `<div class="colchart" style="--cols:${items.length}">${items.map((i) => {
+    const h = Math.round((i.value / mx) * 100);
+    return `<div class="col" title="${esc(i.label)}: ${i.value}${i.sub ? " · " + esc(i.sub) : ""}">
+      <div class="col-val">${i.value || ""}</div>
+      <div class="col-track"><div class="col-bar" style="height:${Math.max(h, i.value ? 6 : 0)}%;background:${color}"></div></div>
+      <div class="col-lab">${esc(i.label)}</div>
+    </div>`;
+  }).join("")}</div>`;
+}
+
+// 24 tunnin histogrammi
+function hourHistHtml(hist, color) {
+  const total = hist.reduce((a, b) => a + b, 0);
+  if (!total) return `<p class="muted">Ei kellonaikatietoja vielä.</p>`;
+  const mx = Math.max(1, ...hist);
+  return `<div class="hourchart">${hist.map((v, h) => {
+    const ht = Math.round((v / mx) * 100);
+    return `<div class="hcol" title="klo ${h}:00–${h}:59 · ${v} keikkaa">
+      <div class="hcol-track"><div class="hcol-bar" style="height:${Math.max(ht, v ? 8 : 0)}%;background:${color}"></div></div>
+      <div class="hcol-lab">${h % 6 === 0 ? h : ""}</div>
+    </div>`;
+  }).join("")}</div>`;
+}
+
+// Viikonpäivät Ma–Su
+function weekdayHtml(hist) {
+  const total = hist.reduce((a, b) => a + b, 0);
+  if (!total) return `<p class="muted">Ei dataa.</p>`;
+  const items = hist.map((v, i) => ({ label: WEEKDAYS[i], value: v }));
+  return columnsHtml(items, { color: "#6366f1" });
+}
+
+// Vuorokaudenaika × kiireellisyys + top-koodit
+function daypartHtml(dayparts) {
+  const maxTotal = Math.max(1, ...dayparts.map((d) => d.total));
+  return dayparts.map((d) => {
+    const segs = ["A", "B", "C", "D"].map((k) => d.urg[k] ? `<span class="seg-fill" style="flex:${d.urg[k]};background:${URGENCY[k].color}" title="${k}: ${d.urg[k]}"></span>` : "").join("");
+    const width = Math.max(Math.round((d.total / maxTotal) * 100), d.total ? 8 : 3);
+    const codes = d.topCodes && d.topCodes.length
+      ? d.topCodes.map((c) => `<span class="dp-code"><b>${esc(c.code)}</b> ${esc(c.name)} <span class="muted">·${c.n}</span></span>`).join("")
+      : `<span class="muted small">ei keikkoja tähän aikaan</span>`;
+    return `<div class="daypart">
+      <div class="dp-head"><span class="dp-name">${esc(d.label)} <span class="muted">${esc(d.short)}</span></span><span class="dp-total">${d.total}</span></div>
+      <div class="dp-track"><div class="dp-bar" style="width:${width}%">${segs || `<span class="seg-fill" style="flex:1;background:var(--surface-2)"></span>`}</div></div>
+      <div class="dp-codes">${codes}</div>
+    </div>`;
+  }).join("");
+}
+
+// Donitsikaavio (conic-gradient) + legenda
+function donutHtml(segments, opts = {}) {
+  const active = segments.filter((s) => s.value > 0);
+  const total = active.reduce((s, x) => s + x.value, 0);
+  if (!total) return `<p class="muted">Ei dataa.</p>`;
+  let acc = 0;
+  const stops = active.map((s) => {
+    const a = (acc / total) * 360; acc += s.value; const b = (acc / total) * 360;
+    return `${s.color} ${a.toFixed(2)}deg ${b.toFixed(2)}deg`;
+  }).join(",");
+  const legend = active.map((s) => `<div class="lg-item"><span class="lg-dot" style="background:${s.color}"></span><span class="lg-lab">${esc(s.label)}</span><b>${s.value}</b><span class="muted">${Math.round((s.value / total) * 100)} %</span></div>`).join("");
+  return `<div class="donut-wrap">
+    <div class="donut2" style="background:conic-gradient(${stops})"><div class="donut2-hole"><b>${esc(String(opts.center ?? total))}</b><span>${esc(opts.sub ?? "yht.")}</span></div></div>
+    <div class="donut-legend">${legend}</div>
+  </div>`;
+}
+
+// Päivä- vs yövuoro -vertailu
+function shiftTypeHtml(s) {
+  const cards = [
+    { key: "day", title: "Päivä 9–21", icon: "☀️" },
+    { key: "night", title: "Yö 21–9", icon: "🌙" },
+  ];
+  if (s.shiftTypeCount.custom) cards.push({ key: "custom", title: "Muu aika", icon: "⏱️" });
+  return cards.map(({ key, title, icon }) => {
+    const shifts = s.shiftTypeCount[key];
+    const calls = s.shiftTypeCalls[key];
+    const transp = s.shiftTypeTransported[key];
+    const avg = shifts ? (calls / shifts).toFixed(1) : "0";
+    const tRate = calls ? Math.round((transp / calls) * 100) : 0;
+    const urg = s.shiftTypeUrg[key];
+    const uTotal = ["A", "B", "C", "D"].reduce((a, k) => a + urg[k], 0);
+    const mini = uTotal ? `<div class="mini-stack">${["A", "B", "C", "D"].map((k) => urg[k] ? `<span style="flex:${urg[k]};background:${URGENCY[k].color}" title="${k}: ${urg[k]}"></span>` : "").join("")}</div>` : "";
+    return `<div class="cmp-card">
+      <div class="cmp-title">${icon} ${esc(title)}</div>
+      <div class="cmp-big">${calls}<span class="muted small"> keikkaa</span></div>
+      <div class="cmp-rows">
+        <div><span class="muted">Vuoroja</span><b>${shifts}</b></div>
+        <div><span class="muted">Keikkaa / vuoro</span><b>${avg}</b></div>
+        <div><span class="muted">Kuljetus</span><b>${tRate} %</b></div>
+      </div>
+      ${mini}
+    </div>`;
+  }).join("");
+}
+
+function shortDate(iso) {
+  const [, m, d] = iso.split("-");
+  return `${parseInt(d, 10)}.${parseInt(m, 10)}.`;
 }
 
 function kpi(value, label) {

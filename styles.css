@@ -108,6 +108,73 @@ a { color: inherit; text-decoration: none; }
   transition: transform .1s, border-color .15s;
 }
 .card:active { transform: scale(.99); }
+
+/* ---------- Stats charts ---------- */
+.small { font-size: .8rem; }
+.kpis-4 { grid-template-columns: repeat(2, 1fr); }
+.chart-card { padding: 16px 14px 12px; }
+.toggle-seg { display: inline-flex; margin-bottom: 12px; }
+
+.insights { display: flex; flex-direction: column; gap: 7px; margin-bottom: 6px; }
+.insight {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 14%, var(--surface)), var(--surface));
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border));
+  border-radius: var(--radius-sm); padding: 9px 12px; font-size: .88rem;
+}
+
+/* Pystypylväät (päivä/viikko/viikonpäivä) */
+.colchart { display: flex; align-items: flex-end; gap: 6px; overflow-x: auto; padding-bottom: 4px; min-height: 130px; }
+.col { display: flex; flex-direction: column; align-items: center; gap: 5px; flex: 1 1 0; min-width: 26px; }
+.col-val { font-size: .72rem; font-weight: 800; color: var(--muted); font-variant-numeric: tabular-nums; min-height: 14px; }
+.col-track { width: 100%; max-width: 30px; height: 96px; display: flex; align-items: flex-end; background: var(--surface-2); border-radius: 7px; overflow: hidden; }
+.col-bar { width: 100%; border-radius: 7px 7px 0 0; transition: height .4s ease; }
+.col-lab { font-size: .68rem; color: var(--muted); white-space: nowrap; font-weight: 600; }
+
+/* 24h histogrammi */
+.hourchart { display: flex; align-items: flex-end; gap: 2px; height: 110px; }
+.hcol { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; }
+.hcol-track { flex: 1; width: 100%; display: flex; align-items: flex-end; }
+.hcol-bar { width: 100%; border-radius: 3px 3px 0 0; min-height: 0; transition: height .4s ease; }
+.hcol-lab { font-size: .62rem; color: var(--muted); height: 12px; font-variant-numeric: tabular-nums; }
+
+/* Vuorokaudenaika × kiireellisyys */
+.daypart { padding: 11px 0; border-bottom: 1px solid var(--border); }
+.daypart:last-child { border-bottom: none; }
+.dp-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.dp-name { font-weight: 700; }
+.dp-total { font-weight: 800; font-variant-numeric: tabular-nums; background: var(--surface-2); padding: 1px 10px; border-radius: 999px; }
+.dp-track { background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+.dp-bar { display: flex; height: 14px; border-radius: 999px; overflow: hidden; min-width: 14px; }
+.seg-fill { display: block; height: 100%; }
+.dp-codes { display: flex; flex-wrap: wrap; gap: 5px 12px; margin-top: 7px; }
+.dp-code { font-size: .8rem; }
+.dp-code b { color: var(--primary); }
+
+/* Donitsi */
+.donut-wrap { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.donut2 { width: 124px; height: 124px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; position: relative; }
+.donut2::after { content: ""; position: absolute; width: 74px; height: 74px; border-radius: 50%; background: var(--surface); }
+.donut2-hole { position: relative; z-index: 1; text-align: center; line-height: 1.1; }
+.donut2-hole b { display: block; font-size: 1.5rem; font-weight: 800; letter-spacing: -.02em; }
+.donut2-hole span { font-size: .72rem; color: var(--muted); }
+.donut-legend { flex: 1; min-width: 150px; display: flex; flex-direction: column; gap: 7px; }
+.lg-item { display: flex; align-items: center; gap: 8px; font-size: .9rem; }
+.lg-dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+.lg-lab { flex: 1; }
+.lg-item b { font-variant-numeric: tabular-nums; }
+.lg-item .muted { min-width: 42px; text-align: right; }
+
+/* Päivä vs yö -vertailu */
+.cmp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.cmp-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); }
+.cmp-title { font-weight: 700; font-size: .92rem; margin-bottom: 8px; }
+.cmp-big { font-size: 1.9rem; font-weight: 800; letter-spacing: -.02em; }
+.cmp-rows { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; font-size: .85rem; }
+.cmp-rows > div { display: flex; justify-content: space-between; }
+.cmp-rows b { font-variant-numeric: tabular-nums; }
+.mini-stack { display: flex; height: 8px; border-radius: 999px; overflow: hidden; margin-top: 10px; background: var(--surface-2); }
+.mini-stack span { display: block; height: 100%; }
+
 .shift-card { position: relative; overflow: hidden; padding-left: 19px; }
 .shift-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--sc); }
 .card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
