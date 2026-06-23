@@ -1,6 +1,6 @@
 import {
   getShifts, getShift, addShift, updateShift, deleteShift,
-  addCall, updateCall, deleteCall,
+  addCall, updateCall, deleteCall, getAllCalls,
   getSettings, updateSettings,
   getCodeNote, setCodeNote,
   exportJSON, importJSON, clearAll,
@@ -251,6 +251,7 @@ calCursor.setDate(1);
 function renderHome() {
   const shifts = getShifts();
   const s = computeStats();
+  const incompleteCount = getAllCalls().filter((c) => !c.disposition).length;
   app.innerHTML = `
     <header class="page-head">
       <div>
@@ -263,10 +264,13 @@ function renderHome() {
       <button type="button" data-v="list" class="${homeView === "list" ? "on" : ""}">Lista</button>
       <button type="button" data-v="calendar" class="${homeView === "calendar" ? "on" : ""}">Kalenteri</button>
     </div>
+    ${incompleteCount ? `<button type="button" class="reminder" id="goIncomplete"><span class="rem-ic">⏳</span> <span><b>${incompleteCount}</b> keskeneräistä keikkaa – täydennä loppuun</span><span class="rem-go">›</span></button>` : ""}
     ${shifts.length === 0 ? emptyState() : ""}
     <div id="home-body"></div>
   `;
   document.getElementById("newShift").onclick = () => openShiftForm();
+  const goInc = document.getElementById("goIncomplete");
+  if (goInc) goInc.onclick = () => { callFilter = { ...callFilter, incomplete: true }; location.hash = "#calls"; };
   document.querySelectorAll(".view-seg button").forEach((b) => {
     b.onclick = () => { homeView = b.dataset.v; renderHome(); };
   });
@@ -693,6 +697,7 @@ function openCallForm(shiftId, existing) {
       <datalist id="codelist">
         ${ALL_CODES.map((x) => `<option value="${x.code}">${x.code} – ${esc(x.name)} (${x.lead})</option>`).join("")}
       </datalist>
+      <div class="quickcodes" id="c-quick">${quickCodesHtml(c.code)}</div>
       <div class="hint" id="c-codehint">${codeHint(c.code)}</div>
       <a class="info-link" id="c-info" href="${infoUrlForCode(c.code)}" target="_blank" rel="noopener">ⓘ Lisätiedot ensihoito-online.fi</a>
       <div class="code-note" id="c-note">${codeNoteHtml(c.code)}</div>
@@ -848,14 +853,19 @@ function openCallForm(shiftId, existing) {
     b.onclick = () => { turgEdited = true; selectUrg(document.getElementById("c-turg"), b.dataset.u); };
   });
   const search = document.getElementById("c-codesearch");
-  search.oninput = () => {
+  const applyCode = () => {
     const code = search.value.trim().toUpperCase();
     document.getElementById("c-codehint").innerHTML = codeHint(code);
     document.getElementById("c-info").href = infoUrlForCode(code);
     document.getElementById("c-note").innerHTML = codeNoteHtml(code);
     refreshGuide();
+    document.querySelectorAll("#c-quick .qc-chip").forEach((x) => x.classList.toggle("on", x.dataset.qc === code));
     if (!tcodeEdited) tcodeEl.value = code;
   };
+  search.oninput = applyCode;
+  document.querySelectorAll("#c-quick .qc-chip").forEach((b) => {
+    b.onclick = () => { search.value = b.dataset.qc; applyCode(); };
+  });
   document.getElementById("c-note").onclick = (e) => {
     const a = e.target.closest("[data-editnote]");
     if (!a) return;
@@ -918,6 +928,30 @@ function codeHint(code) {
   const info = CODE_MAP.get((code || "").toUpperCase());
   if (!info) return "";
   return `<span class="lead-tag" style="--lc:${info.color}">${info.lead}</span> ${esc(info.name)} · <span class="muted">${esc(info.category)}</span>`;
+}
+// Pikavalinta: omat yleisimmät/viimeisimmät koodit, tai oletusjoukko ilman historiaa.
+const QUICK_DEFAULTS = ["745", "704", "703", "702", "774", "781", "785", "770"];
+function topCodesForQuickPick(limit = 8) {
+  const freq = {}, lastSeen = {};
+  for (const c of getAllCalls()) {
+    if (!c.code) continue;
+    freq[c.code] = (freq[c.code] || 0) + 1;
+    const ts = (c.shift?.date || "") + (c.time || "");
+    if (!lastSeen[c.code] || ts > lastSeen[c.code]) lastSeen[c.code] = ts;
+  }
+  const codes = Object.keys(freq);
+  if (!codes.length) return QUICK_DEFAULTS.filter((c) => CODE_MAP.has(c)).slice(0, limit);
+  codes.sort((a, b) => (freq[b] - freq[a]) || (lastSeen[b] > lastSeen[a] ? 1 : -1));
+  return codes.slice(0, limit);
+}
+function quickCodesHtml(currentCode) {
+  const cur = (currentCode || "").toUpperCase();
+  const codes = topCodesForQuickPick(8);
+  if (!codes.length) return "";
+  return `<div class="qc-label">Pikavalinta</div><div class="qc-row">${codes.map((code) => {
+    const name = CODE_MAP.get(code)?.name || "";
+    return `<button type="button" class="qc-chip ${cur === code ? "on" : ""}" data-qc="${esc(code)}"><b>${esc(code)}</b> ${esc(name)}</button>`;
+  }).join("")}</div>`;
 }
 // Kevyt, turvallinen Markdown-muotoilu omille muistiinpanoille.
 // Tukee: # otsikot, **lihavointi**, *kursiivi*, - / 1. listat, [linkki](url),
