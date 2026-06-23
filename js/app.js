@@ -226,6 +226,8 @@ function route() {
     case "codes": return renderCodes();
     case "tools": return renderTools();
     case "report": return renderReport();
+    case "weekreport": return renderWeekReport();
+    case "ekg": return renderEkg();
     case "settings": return renderSettings();
     default: return renderHome();
   }
@@ -237,7 +239,7 @@ function parseHash(hash) {
 }
 
 function setActiveTab(path) {
-  const tab = ["shift", "summary"].includes(path) ? "home" : (path === "report" ? "tools" : path);
+  const tab = ["shift", "summary"].includes(path) ? "home" : (["report", "weekreport", "ekg"].includes(path) ? "tools" : path);
   document.querySelectorAll(".tabbar a").forEach((a) => {
     a.classList.toggle("active", a.dataset.tab === tab);
   });
@@ -1611,9 +1613,18 @@ function renderTools() {
     <header class="page-head"><h1>Työkalut</h1></header>
 
     <section class="settings-block">
-      <h2>Jakson raportti</h2>
-      <p class="muted">Koko harjoittelun yhteenveto tulostettavaksi / PDF:ksi ohjaajalle.</p>
-      <a class="btn primary" href="#report">Avaa jakson raportti →</a>
+      <h2>Raportit</h2>
+      <p class="muted">Yhteenvedot tulostettavaksi / PDF:ksi ohjaajalle.</p>
+      <div class="btn-row">
+        <a class="btn primary" href="#report">Jakson raportti →</a>
+        <a class="btn" href="#weekreport">Viikkoraportti →</a>
+      </div>
+    </section>
+
+    <section class="settings-block">
+      <h2>EKG-kortit</h2>
+      <p class="muted">Harjoittele rytmintunnistusta. Toistuva kertaus (Leitner) painottaa kortteja, jotka eivät vielä ole hallussa. Voit lisätä omia kortteja ja kuvia.</p>
+      <a class="btn primary" href="#ekg">Avaa EKG-kortit →</a>
     </section>
 
     <section class="settings-block">
@@ -1803,6 +1814,257 @@ function renderReport() {
     </article>
   `;
   document.getElementById("printBtn").onclick = () => window.print();
+}
+
+// ---------- Viikkoraportti ----------
+let weekReportSel = null;
+function isoWeekOf(dateStr) {
+  const d = new Date(dateStr + "T00:00:00");
+  if (isNaN(d)) return "?";
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dn = (t.getUTCDay() + 6) % 7;
+  t.setUTCDate(t.getUTCDate() - dn + 3);
+  const ft = new Date(Date.UTC(t.getUTCFullYear(), 0, 4));
+  const fdn = (ft.getUTCDay() + 6) % 7;
+  ft.setUTCDate(ft.getUTCDate() - fdn + 3);
+  const wk = 1 + Math.round((t - ft) / (7 * 24 * 3600 * 1000));
+  return `${t.getUTCFullYear()}-W${String(wk).padStart(2, "0")}`;
+}
+function weekDateRange(wk) {
+  const m = wk.match(/^(\d{4})-W(\d+)$/);
+  if (!m) return "";
+  const year = +m[1], week = +m[2];
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const jan4dn = (jan4.getUTCDay() + 6) % 7;
+  const monday = new Date(jan4);
+  monday.setUTCDate(jan4.getUTCDate() - jan4dn + (week - 1) * 7);
+  const sunday = new Date(monday);
+  sunday.setUTCDate(monday.getUTCDate() + 6);
+  const fmt = (d) => `${d.getUTCDate()}.${d.getUTCMonth() + 1}.`;
+  return `${fmt(monday)}–${fmt(sunday)}${year !== new Date().getFullYear() ? sunday.getUTCFullYear() : ""}`;
+}
+function renderWeekReport() {
+  const shifts = getShifts();
+  const weeks = [...new Set(shifts.map((s) => isoWeekOf(s.date)))].sort().reverse();
+  if (!weeks.length) {
+    app.innerHTML = `<div class="no-print page-head"><a class="back" href="#tools">‹ Työkalut</a></div>
+      <div class="empty"><div class="empty-icon">📅</div><h2>Ei vielä dataa</h2><p>Kirjaa vuoroja, niin viikkoraportti kertyy tähän.</p></div>`;
+    return;
+  }
+  if (!weekReportSel || !weeks.includes(weekReportSel)) weekReportSel = weeks[0];
+  const wk = weekReportSel;
+  const wkShifts = shifts.filter((s) => isoWeekOf(s.date) === wk).sort((a, b) => (a.date < b.date ? -1 : 1));
+  const calls = [];
+  for (const s of wkShifts) for (const c of s.calls || []) calls.push({ ...c, shift: s });
+  const hours = Math.round(wkShifts.reduce((sum, s) => sum + shiftHours(s), 0) * 10) / 10;
+  const urg = { A: 0, B: 0, C: 0, D: 0 };
+  const byCode = {}, byTag = {}, tagItse = {};
+  let transported = 0;
+  const reflections = [];
+  for (const c of calls) {
+    if (urg[c.urgency] != null) urg[c.urgency]++;
+    if (c.code) byCode[c.code] = (byCode[c.code] || 0) + 1;
+    if (c.disposition === "Kuljetettu") transported++;
+    for (const t of c.tags || []) { byTag[t] = (byTag[t] || 0) + 1; if (c.role === "Suoritin itse") tagItse[t] = (tagItse[t] || 0) + 1; }
+    if (c.reflection) reflections.push({ date: c.shift.date, code: c.code, text: c.reflection });
+  }
+  for (const s of wkShifts) if (s.notes) reflections.push({ date: s.date, code: "", text: s.notes, shift: true });
+  reflections.sort((a, b) => (a.date < b.date ? -1 : 1));
+  const topCodes = Object.entries(byCode).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const topTags = Object.entries(byTag).sort((a, b) => b[1] - a[1]);
+  const tRate = calls.length ? Math.round((transported / calls.length) * 100) : 0;
+
+  app.innerHTML = `
+    <div class="no-print page-head">
+      <a class="back" href="#tools">‹ Työkalut</a>
+      <button class="btn primary" id="printBtn">🖨️ Tulosta / PDF</button>
+    </div>
+    <div class="no-print wr-pick">
+      <label class="field">Viikko
+        <select id="wr-sel">${weeks.map((w) => `<option value="${w}" ${w === wk ? "selected" : ""}>${weekLabel(w)} (${weekDateRange(w)})</option>`).join("")}</select>
+      </label>
+    </div>
+    <article class="print-view">
+      <div class="pv-head">
+        <h1>KenttäLog – viikkoraportti</h1>
+        <div class="pv-meta">${weekLabel(wk)} · ${weekDateRange(wk)} · ${wkShifts.length} vuoroa · ${calls.length} keikkaa · ${hours} h</div>
+      </div>
+      <div class="pv-stats">
+        <span><b>${calls.length}</b> keikkaa</span>
+        <span><b>${tRate}%</b> kuljetettu</span>
+        <span>A:${urg.A} B:${urg.B} C:${urg.C} D:${urg.D}</span>
+      </div>
+
+      <h2>Vuorot</h2>
+      <table class="pv-table"><thead><tr><th>Pvm</th><th>Tyyppi</th><th>Asema/yksikkö</th><th>Keikkaa</th></tr></thead><tbody>
+        ${wkShifts.map((s) => `<tr><td>${formatDate(s.date)}</td><td>${esc(shiftTypeText(s))}</td><td>${esc([s.station, s.unit].filter(Boolean).join(" / "))}</td><td>${(s.calls || []).length}</td></tr>`).join("")}
+      </tbody></table>
+
+      ${topTags.length ? `<h2>Toimenpiteet ja tapaukset</h2>
+      <table class="pv-table"><thead><tr><th>Toimenpide</th><th>Kpl</th><th>Itse</th></tr></thead><tbody>
+        ${topTags.map(([t, n]) => `<tr><td>${esc(t)}</td><td>${n}</td><td>${tagItse[t] || 0}</td></tr>`).join("")}
+      </tbody></table>` : ""}
+
+      ${topCodes.length ? `<h2>Tehtäväkoodit</h2>
+      <table class="pv-table"><thead><tr><th>Koodi</th><th>Tehtävä</th><th>Kpl</th></tr></thead><tbody>
+        ${topCodes.map(([code, n]) => `<tr><td>${esc(code)}</td><td>${esc(CODE_MAP.get(code)?.name || "")}</td><td>${n}</td></tr>`).join("")}
+      </tbody></table>` : ""}
+
+      ${reflections.length ? `<h2>Reflektiot ja oppimispäiväkirja</h2>
+        ${reflections.map((r) => `<p class="pv-refl"><b>${formatDate(r.date)}${r.code ? " · " + esc(r.code) : (r.shift ? " · vuoro" : "")}:</b> ${esc(r.text)}</p>`).join("")}` : `<p class="muted">Ei reflektioita tältä viikolta.</p>`}
+
+      <p class="pv-foot">Henkilökohtainen oppimispäiväkirja. Ei sisällä potilaan tunnistetietoja. Ei virallinen potilasasiakirja.</p>
+    </article>
+  `;
+  document.getElementById("printBtn").onclick = () => window.print();
+  document.getElementById("wr-sel").onchange = (e) => { weekReportSel = e.target.value; renderWeekReport(); };
+}
+function shiftTypeText(s) {
+  if (s.type === "day") return "Päivä 9–21";
+  if (s.type === "night") return "Yö 21–9";
+  return `${s.startTime || ""}–${s.endTime || ""}`;
+}
+
+// ---------- EKG-kortit (rytmintunnistus, Leitner-toisto) ----------
+// Yleistä, itse laadittua rytmintunnistustietoa (ei kopioitua sisältöä, ei kuvia).
+const EKG_DECK = [
+  { id: "ekg-sinus", q: "Sinusrytmi", a: "P-aalto ennen jokaista QRS:ää, säännöllinen, taajuus 60–100/min. Normaali perusrytmi." },
+  { id: "ekg-brady", q: "Sinusbradykardia", a: "Sinusrytmi alle 60/min. Oireinen ja hidas → harkitse syytä ja hoitoa (esim. tahdistus) hoito-ohjeen mukaan." },
+  { id: "ekg-tachy", q: "Sinustakykardia", a: "Sinusrytmi yli 100/min, P-aallot näkyvissä. Etsi taustasyy (kipu, kuume, hypovolemia, hypoksia)." },
+  { id: "ekg-af", q: "Eteisvärinä (FA)", a: "Epäsäännöllisen epäsäännöllinen, ei selkeitä P-aaltoja. Nopea kammiovaste voi olla oireinen." },
+  { id: "ekg-flutter", q: "Eteislepatus (flutter)", a: "Sahalaita-aallot (eteistaajuus n. 300/min), usein säännöllinen kammiovaste (esim. 2:1 → ~150/min)." },
+  { id: "ekg-svt", q: "Supraventrikulaarinen takykardia (SVT)", a: "Kapea QRS, säännöllinen, nopea (usein >150/min), P-aaltoja vaikea erottaa. Epävakaa → kardioversio hoito-ohjeen mukaan." },
+  { id: "ekg-vt", q: "Kammiotakykardia (VT)", a: "Leveä QRS, säännöllinen ja nopea. Suhtaudu kammioperäisenä; epävakaa → kardioversio, pulssiton → defibrillointi." },
+  { id: "ekg-vf", q: "Kammiovärinä (VF)", a: "Kaoottinen, ei tunnistettavia QRS-komplekseja. Iskettävä rytmi → defibrillointi viiveettä + painelu." },
+  { id: "ekg-asys", q: "Asystolia", a: "Ei sähköistä toimintaa (lähes suora viiva). EI iskettävä → painelu, adrenaliini ja syyn hoito." },
+  { id: "ekg-pea", q: "PEA (sykkeetön rytmi)", a: "Monitorissa organisoitunut rytmi, mutta ei pulssia. EI iskettävä → painelu ja palautuvien syiden hoito." },
+  { id: "ekg-av1", q: "I asteen AV-katkos", a: "PQ-aika pitkä (>200 ms), mutta jokainen P-aalto johtuu kammioihin. Yleensä hyvänlaatuinen." },
+  { id: "ekg-av2a", q: "II asteen AV-katkos, Mobitz I (Wenckebach)", a: "PQ-aika pitenee lyönti lyönniltä, kunnes yksi QRS jää väliin. Usein hyvänlaatuinen." },
+  { id: "ekg-av2b", q: "II asteen AV-katkos, Mobitz II", a: "Ajoittain P-aalto ei johdu, PQ-aika pysyy vakiona. Voi edetä täydelliseksi katkokseksi → seuraa tarkasti." },
+  { id: "ekg-av3", q: "III asteen AV-katkos (täydellinen)", a: "P-aallot ja QRS-kompleksit täysin toisistaan riippumatta. Usein hidas ja oireinen → tahdistusvalmius." },
+  { id: "ekg-stemi", q: "STEMI (ST-nousuinfarkti)", a: "ST-nousu vähintään kahdessa vierekkäisessä kytkennässä. Ennakkoilmoitus ja kuljetus PCI-valmiuteen." },
+  { id: "ekg-ves", q: "Kammiolisälyönti (VES)", a: "Ennenaikainen leveä QRS ilman edeltävää P-aaltoa. Yksittäisinä usein vaaraton; tiheät/parittaiset huomioi." },
+  { id: "ekg-pace", q: "Tahdistinrytmi", a: "Kapeat tahdistuspiikit ennen P-aaltoa ja/tai QRS:ää. Tunnista piikit ja arvioi tahdistuksen toimivuus." },
+];
+function getEkgProgress() { return getSettings().ekgProgress || {}; }
+function getEkgDeck() {
+  const custom = (getSettings().ekgCards || []).map((c) => ({ ...c, custom: true }));
+  return [...EKG_DECK, ...custom];
+}
+function ekgMastered(deck) {
+  const prog = getEkgProgress();
+  return deck.filter((c) => (prog[c.id] || 0) >= 4).length;
+}
+let ekgState = null;
+function startEkgSession(deck) {
+  const prog = getEkgProgress();
+  const queue = deck.map((c) => ({ id: c.id, box: prog[c.id] || 0 }))
+    .sort((a, b) => (a.box - b.box) || (Math.random() - 0.5))
+    .map((x) => x.id);
+  return { queue, idx: 0, flipped: false };
+}
+function renderEkg() {
+  const deck = getEkgDeck();
+  if (!deck.length) {
+    app.innerHTML = `<div class="no-print page-head"><a class="back" href="#tools">‹ Työkalut</a></div>
+      <div class="empty"><div class="empty-icon">📈</div><h2>Ei kortteja</h2></div>`;
+    return;
+  }
+  if (!ekgState) ekgState = startEkgSession(deck);
+  const total = ekgState.queue.length;
+  const done = ekgState.idx >= total;
+  const mastered = ekgMastered(deck);
+
+  if (done) {
+    app.innerHTML = `
+      <header class="page-head"><a class="back" href="#tools">‹ Työkalut</a><h1>EKG-kortit</h1></header>
+      <div class="ekg-summary card">
+        <div class="empty-icon">✅</div>
+        <h2>Kierros valmis!</h2>
+        <p class="muted">Hallussa ${mastered}/${deck.length} korttia.</p>
+        <button class="btn primary" id="ekg-restart">Aloita uusi kierros</button>
+      </div>
+      <button class="btn" id="ekg-add" style="margin-top:12px">+ Lisää oma kortti</button>
+    `;
+    document.getElementById("ekg-restart").onclick = () => { ekgState = startEkgSession(getEkgDeck()); renderEkg(); };
+    document.getElementById("ekg-add").onclick = () => openEkgCardForm();
+    return;
+  }
+
+  const card = deck.find((c) => c.id === ekgState.queue[ekgState.idx]);
+  const prog = getEkgProgress();
+  const box = prog[card.id] || 0;
+  app.innerHTML = `
+    <header class="page-head"><a class="back" href="#tools">‹ Työkalut</a><h1>EKG-kortit</h1></header>
+    <div class="ekg-top">
+      <span class="muted">Kortti ${ekgState.idx + 1}/${total}</span>
+      <span class="muted">Hallussa ${mastered}/${deck.length}</span>
+    </div>
+    <div class="bartrack ekg-bar"><div class="barfill" style="width:${Math.round((ekgState.idx / total) * 100)}%"></div></div>
+    <button type="button" class="ekg-card ${ekgState.flipped ? "flipped" : ""}" id="ekg-flip">
+      <div class="ekg-box">Taso ${box}/5</div>
+      ${card.img ? `<img class="ekg-img" src="${esc(card.img)}" alt="">` : ""}
+      <div class="ekg-q">${esc(card.q)}</div>
+      ${ekgState.flipped
+        ? `<div class="ekg-a">${esc(card.a || "")}</div>`
+        : `<div class="ekg-hint">Napauta nähdäksesi vastauksen</div>`}
+    </button>
+    ${ekgState.flipped ? `
+      <div class="ekg-actions">
+        <button class="btn ekg-no" id="ekg-no">En osannut</button>
+        <button class="btn primary ekg-yes" id="ekg-yes">Osasin</button>
+      </div>` : `
+      <button class="btn primary ekg-show" id="ekg-show">Näytä vastaus</button>`}
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn" id="ekg-add">+ Oma kortti</button>
+      ${card.custom ? `<button class="btn danger" id="ekg-del">Poista kortti</button>` : ""}
+    </div>
+  `;
+  const flip = () => { ekgState.flipped = true; renderEkg(); };
+  document.getElementById("ekg-flip").onclick = () => { ekgState.flipped = !ekgState.flipped; renderEkg(); };
+  if (document.getElementById("ekg-show")) document.getElementById("ekg-show").onclick = flip;
+  const answer = (known) => {
+    const p = { ...getEkgProgress() };
+    p[card.id] = known ? Math.min(5, (p[card.id] || 0) + 1) : 1;
+    updateSettings({ ekgProgress: p });
+    ekgState.idx++; ekgState.flipped = false;
+    renderEkg();
+  };
+  if (document.getElementById("ekg-yes")) document.getElementById("ekg-yes").onclick = () => answer(true);
+  if (document.getElementById("ekg-no")) document.getElementById("ekg-no").onclick = () => answer(false);
+  document.getElementById("ekg-add").onclick = () => openEkgCardForm();
+  if (document.getElementById("ekg-del")) document.getElementById("ekg-del").onclick = () => {
+    if (!confirm("Poistetaanko tämä oma kortti?")) return;
+    const cards = (getSettings().ekgCards || []).filter((c) => c.id !== card.id);
+    updateSettings({ ekgCards: cards });
+    ekgState = startEkgSession(getEkgDeck());
+    renderEkg();
+  };
+}
+function openEkgCardForm() {
+  openModal("Uusi EKG-kortti", `
+    <label>Etupuoli (kysymys / rytmin nimi)
+      <input type="text" id="ekg-cq" placeholder="esim. Kammiotakykardia">
+    </label>
+    <label>Takapuoli (vastaus / tunnusmerkit)
+      <textarea id="ekg-ca" rows="4" placeholder="Tunnusmerkit ja toiminta omin sanoin"></textarea>
+    </label>
+    <label>Kuvan osoite (valinnainen)
+      <input type="text" id="ekg-cimg" placeholder="https://…/oma-rytmistrippi.png">
+    </label>
+    <p class="form-note">Tallentuu vain tähän laitteeseen. Voit liittää oman rytmikuvasi osoitteen.</p>
+  `, {
+    onSave: () => {
+      const q = val("ekg-cq").trim();
+      if (!q) { toast("Anna kortille etupuoli"); return; }
+      const cards = [...(getSettings().ekgCards || [])];
+      cards.push({ id: "user-" + Date.now().toString(36), q, a: val("ekg-ca").trim(), img: val("ekg-cimg").trim() });
+      updateSettings({ ekgCards: cards });
+      closeModal();
+      ekgState = startEkgSession(getEkgDeck());
+      renderEkg();
+    },
+  });
 }
 
 // ---------- Asetukset ----------

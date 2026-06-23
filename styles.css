@@ -536,3 +536,33 @@ a { color: inherit; text-decoration: none; }
 /* ---------- Toast ---------- */
 .toast { position: fixed; bottom: calc(var(--tabbar-h) + 16px); left: 50%; transform: translateX(-50%) translateY(20px); background: var(--elevated); color: var(--text); border: 1px solid var(--border); padding: 11px 20px; border-radius: 999px; font-size: .9rem; font-weight: 700; opacity: 0; transition: all .25s; z-index: 60; box-shadow: var(--shadow-lg); }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ---------- Weekly report picker ---------- */
+.wr-pick { margin-bottom: 16px; }
+
+/* ---------- EKG flashcards ---------- */
+.ekg-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.ekg-bar { margin-bottom: 16px; }
+.ekg-card {
+  display: block; width: 100%; text-align: left; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 24px 20px; box-shadow: var(--shadow); transition: transform .15s, box-shadow .15s;
+  color: var(--text); font: inherit; line-height: 1.45;
+}
+.ekg-card:active { transform: scale(.98); }
+.ekg-card.flipped { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 8%, var(--surface)); }
+.ekg-box {
+  display: inline-block; font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em;
+  padding: 3px 9px; border-radius: 999px; margin-bottom: 10px;
+  background: color-mix(in srgb, var(--primary) 18%, var(--surface-2)); color: var(--primary);
+}
+.ekg-img { width: 100%; border-radius: var(--radius-sm); margin-bottom: 12px; }
+.ekg-q { font-size: 1.15rem; font-weight: 800; margin-bottom: 6px; }
+.ekg-a { font-size: .95rem; color: var(--text); margin-top: 10px; line-height: 1.55; }
+.ekg-hint { font-size: .88rem; color: var(--muted); font-style: italic; margin-top: 10px; }
+.ekg-actions { display: flex; gap: 10px; margin-top: 14px; }
+.ekg-actions .btn { flex: 1; }
+.ekg-no { background: color-mix(in srgb, var(--danger) 18%, var(--surface)) !important; color: var(--danger) !important; border-color: color-mix(in srgb, var(--danger) 35%, var(--border)) !important; }
+.ekg-show { width: 100%; margin-top: 14px; }
+.ekg-summary { text-align: center; padding: 32px 20px; }
+.ekg-summary h2 { margin-top: 8px; }

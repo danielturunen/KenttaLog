@@ -35,6 +35,9 @@ const DEFAULT_DATA = {
     internshipEnd: "",
     targetHours: 0,
     targetShifts: 0,
+    // EKG-korttien edistyminen (Leitner-laatikot) ja käyttäjän omat kortit
+    ekgProgress: {},
+    ekgCards: [],
     // Käyttäjän omat muistiinpanot per tehtäväkoodi: { "704": "omin sanoin..." }
     codeNotes: {},
   },
