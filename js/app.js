@@ -227,6 +227,7 @@ function route() {
     case "tools": return renderTools();
     case "report": return renderReport();
     case "weekreport": return renderWeekReport();
+    case "portfolio": return renderPortfolio();
     case "ekg": return renderEkg();
     case "settings": return renderSettings();
     default: return renderHome();
@@ -239,7 +240,7 @@ function parseHash(hash) {
 }
 
 function setActiveTab(path) {
-  const tab = ["shift", "summary"].includes(path) ? "home" : (["report", "weekreport", "ekg"].includes(path) ? "tools" : path);
+  const tab = ["shift", "summary"].includes(path) ? "home" : (["report", "weekreport", "portfolio", "ekg"].includes(path) ? "tools" : path);
   document.querySelectorAll(".tabbar a").forEach((a) => {
     a.classList.toggle("active", a.dataset.tab === tab);
   });
@@ -550,7 +551,22 @@ function renderShiftDetail(id) {
   document.getElementById("newCall").onclick = () => openCallForm(s.id);
   document.getElementById("fabCall").onclick = () => openCallForm(s.id);
   app.querySelectorAll("[data-call]").forEach((el) => {
-    el.onclick = () => openCallForm(s.id, (s.calls || []).find((c) => c.id === el.dataset.call));
+    el.onclick = (e) => {
+      if (e.target.closest("[data-dup]")) return;
+      openCallForm(s.id, (s.calls || []).find((c) => c.id === el.dataset.call));
+    };
+  });
+  app.querySelectorAll("[data-dup]").forEach((b) => {
+    b.onclick = (e) => {
+      e.stopPropagation();
+      const src = (s.calls || []).find((c) => c.id === b.dataset.dup);
+      if (!src) return;
+      const { id, ...rest } = src;
+      const dup = { ...rest, time: nowTime(), description: "", reflection: "", timeline: null, photos: null };
+      addCall(s.id, dup);
+      toast("Keikka kopioitu");
+      renderShiftDetail(s.id);
+    };
   });
 }
 
@@ -585,8 +601,10 @@ function callRow(shiftId, c) {
           ${(c.tags || []).map((t) => `<span class="meta-pill tag">${esc(t)}</span>`).join("")}
           ${c.role ? `<span class="meta-pill role">${esc(c.role)}</span>` : ""}
           ${(c.timeline || []).length ? `<span class="meta-pill tl">⏱ ${c.timeline.length} tapahtumaa</span>` : ""}
+          ${(c.photos || []).length ? `<span class="meta-pill">📷 ${c.photos.length}</span>` : ""}
         </div>
       </div>
+      <button class="dup-btn" data-dup="${c.id}" title="Kopioi keikka">⧉</button>
     </div>`;
 }
 
@@ -682,6 +700,7 @@ function openCallForm(shiftId, existing) {
   const settings = getSettings();
   const c = existing || { time: nowTime(), urgency: "", disposition: "" };
   let timeline = (c.timeline || []).map((e) => ({ ...e }));
+  let photos = (c.photos || []).slice();
   // Sisäänrakennetut toimenpiteet + käyttäjän omat tagit
   const allTags = [...new Set([...PROCEDURES, ...(settings.tags || [])])];
   const isX = (c.disposition || "").startsWith("X-");
@@ -778,6 +797,11 @@ function openCallForm(shiftId, existing) {
     <label>Reflektio – mitä opin
       <textarea id="c-reflect" rows="2" placeholder="Lyhyt oppi tästä keikasta">${esc(c.reflection || "")}</textarea>
     </label>
+    <label>Kuvat (vapaaehtoinen, ei potilastietoja)
+      <input type="file" id="c-photo" accept="image/*" multiple capture="environment">
+      <div class="photo-grid" id="c-photos">${(c.photos || []).map((p, i) => `<div class="photo-thumb"><img src="${esc(p)}" alt=""><button type="button" class="photo-del" data-pi="${i}">×</button></div>`).join("")}</div>
+      <p class="form-note">Esim. rytmistrippi, tilannekuva (anonymisoitu). Tallentuu tähän laitteeseen.</p>
+    </label>
   `, {
     onSave: () => {
       const code = val("c-codesearch").trim().toUpperCase();
@@ -811,6 +835,7 @@ function openCallForm(shiftId, existing) {
         reflection: val("c-reflect"),
         vitals: hasVitals ? vitals : null,
         timeline: timeline.length ? timeline : null,
+        photos: photos.length ? photos : null,
       };
       if (existing) updateCall(shiftId, existing.id, patch);
       else addCall(shiftId, patch);
@@ -924,6 +949,23 @@ function openCallForm(shiftId, existing) {
     if (e.key === "Enter") { e.preventDefault(); tlAdd(); }
   });
   renderTl();
+  // Kuvaliitteet
+  const photosEl = document.getElementById("c-photos");
+  const renderPhotos = () => {
+    photosEl.innerHTML = photos.map((p, i) => `<div class="photo-thumb"><img src="${esc(p)}" alt=""><button type="button" class="photo-del" data-pi="${i}">×</button></div>`).join("");
+    photosEl.querySelectorAll(".photo-del").forEach((b) => {
+      b.onclick = () => { photos.splice(Number(b.dataset.pi), 1); renderPhotos(); };
+    });
+  };
+  renderPhotos();
+  document.getElementById("c-photo").onchange = (e) => {
+    for (const file of e.target.files) {
+      const reader = new FileReader();
+      reader.onload = () => { photos.push(reader.result); renderPhotos(); };
+      reader.readAsDataURL(file);
+    }
+    e.target.value = "";
+  };
 }
 
 function codeHint(code) {
@@ -1618,6 +1660,7 @@ function renderTools() {
       <div class="btn-row">
         <a class="btn primary" href="#report">Jakson raportti →</a>
         <a class="btn" href="#weekreport">Viikkoraportti →</a>
+        <a class="btn" href="#portfolio">CV-portfolio →</a>
       </div>
     </section>
 
@@ -1923,6 +1966,85 @@ function shiftTypeText(s) {
   if (s.type === "day") return "Päivä 9–21";
   if (s.type === "night") return "Yö 21–9";
   return `${s.startTime || ""}–${s.endTime || ""}`;
+}
+
+// ---------- CV / Portfolio (tulostettava osaamisyhteenveto) ----------
+function renderPortfolio() {
+  const shifts = getShifts();
+  const allC = getAllCalls();
+  const s = computeStats();
+  const settings = getSettings();
+  const dates = shifts.map((x) => x.date).filter(Boolean).sort();
+  const from = dates.length ? formatDate(dates[0]) : "–";
+  const to = dates.length ? formatDate(dates[dates.length - 1]) : "–";
+  const totalH = shifts.reduce((sum, x) => sum + shiftHours(x), 0);
+  const urg = { A: 0, B: 0, C: 0, D: 0 };
+  let transported = 0;
+  const tagCount = {}, codeCount = {}, stationSet = new Set();
+  for (const c of allC) {
+    if (urg[c.urgency] != null) urg[c.urgency]++;
+    if (c.disposition === "Kuljetettu") transported++;
+    for (const t of c.tags || []) tagCount[t] = (tagCount[t] || 0) + 1;
+    if (c.code) codeCount[c.code] = (codeCount[c.code] || 0) + 1;
+    if (c.shift?.station) stationSet.add(c.shift.station);
+  }
+  const topTags = Object.entries(tagCount).sort((a, b) => b[1] - a[1]);
+  const topCodes = Object.entries(codeCount).sort((a, b) => b[1] - a[1]).slice(0, 15);
+  const goals = settings.goals || [];
+  const goalRows = goals.map((g) => {
+    const done = tagCount[g.tag] || 0;
+    return { tag: g.tag, target: g.target, done, pct: g.target ? Math.min(100, Math.round((done / g.target) * 100)) : 100 };
+  });
+  const ekgDeck = getEkgDeck();
+  const ekgMast = ekgMastered(ekgDeck);
+
+  app.innerHTML = `
+    <div class="no-print page-head">
+      <a class="back" href="#tools">‹ Työkalut</a>
+      <button class="btn primary" id="printBtn">🖨️ Tulosta / PDF</button>
+    </div>
+    <article class="print-view">
+      <div class="pv-head">
+        <h1>KenttäLog – osaamisportfolio</h1>
+        <div class="pv-meta">Kenttäharjoittelu ${from} – ${to}</div>
+      </div>
+
+      <h2>Yhteenveto</h2>
+      <div class="pv-stats">
+        <span><b>${shifts.length}</b> vuoroa</span>
+        <span><b>${totalH}</b> tuntia</span>
+        <span><b>${allC.length}</b> keikkaa</span>
+        <span><b>${transported}</b> kuljetusta</span>
+      </div>
+      <div class="pv-stats">
+        <span>A: ${urg.A}</span><span>B: ${urg.B}</span><span>C: ${urg.C}</span><span>D: ${urg.D}</span>
+        <span>Asemia: ${stationSet.size}</span>
+      </div>
+
+      ${topTags.length ? `<h2>Toimenpiteet ja kliiniset kokemukset</h2>
+      <table class="pv-table"><thead><tr><th>Toimenpide</th><th>Kertaa</th></tr></thead><tbody>
+        ${topTags.map(([t, n]) => `<tr><td>${esc(t)}</td><td>${n}</td></tr>`).join("")}
+      </tbody></table>` : ""}
+
+      ${goalRows.length ? `<h2>Osaamistavoitteet</h2>
+      <table class="pv-table"><thead><tr><th>Tavoite</th><th>Tehty</th><th>Tavoite</th><th>%</th></tr></thead><tbody>
+        ${goalRows.map((g) => `<tr><td>${esc(g.tag)}</td><td>${g.done}</td><td>${g.target}</td><td>${g.pct}%</td></tr>`).join("")}
+      </tbody></table>` : ""}
+
+      ${topCodes.length ? `<h2>Yleisimmät tehtäväkoodit</h2>
+      <table class="pv-table"><thead><tr><th>Koodi</th><th>Tehtävä</th><th>Kertaa</th></tr></thead><tbody>
+        ${topCodes.map(([code, n]) => `<tr><td>${esc(code)}</td><td>${esc(CODE_MAP.get(code)?.name || "")}</td><td>${n}</td></tr>`).join("")}
+      </tbody></table>` : ""}
+
+      <h2>EKG-rytmintunnistus</h2>
+      <p>Hallussa ${ekgMast}/${ekgDeck.length} rytmiä (Leitner-toisto).</p>
+
+      ${stationSet.size ? `<h2>Harjoitteluasemat</h2><p>${[...stationSet].sort().map(esc).join(", ")}</p>` : ""}
+
+      <p class="pv-foot">Luotu KenttäLog-sovelluksella. Henkilökohtainen osaamisyhteenveto kenttäharjoittelusta.</p>
+    </article>
+  `;
+  document.getElementById("printBtn").onclick = () => window.print();
 }
 
 // ---------- EKG-kortit (rytmintunnistus, Leitner-toisto) ----------
