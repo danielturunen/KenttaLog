@@ -2400,12 +2400,23 @@ function renderSettings() {
 
     <section class="settings-block">
       <h2>Varmuuskopio</h2>
-      <p class="muted">Yksi tiedosto sisältää kaiken: vuorot, keikat sekä oletusasema, -yksikkö ja muut asetukset. Tiedot tallentuvat vain tähän selaimeen, joten ota varmuuskopio säännöllisesti.</p>
+      <p class="muted">Yksi tiedosto sisältää kaiken: vuorot, keikat, kuvat, EKG-edistyminen, muistiinpanot ja asetukset. Tiedot tallentuvat vain tähän selaimeen, joten ota varmuuskopio säännöllisesti.</p>
       <div class="btn-row">
-        <button class="btn primary" id="expJson">⬇︎ Vie varmuuskopio</button>
-        <button class="btn" id="impBtn">⬆︎ Palauta varmuuskopiosta</button>
+        <button class="btn primary" id="expJson">⬆︎ Vie / jaa varmuuskopio</button>
+        <button class="btn" id="impBtn">⬇︎ Palauta varmuuskopiosta</button>
         <input type="file" id="impFile" accept="application/json" hidden>
       </div>
+    </section>
+
+    <section class="settings-block">
+      <h2>Monen laitteen käyttö (iCloud)</h2>
+      <p class="muted">Sovellus tallentaa tiedot vain tälle laitteelle, eikä synkronoi automaattisesti. Voit silti pitää tiedot ajan tasalla useilla laitteilla iCloud Driven kautta:</p>
+      <ol class="howto">
+        <li><b>Vie / jaa varmuuskopio</b> → valitse <b>Tallenna Tiedostoihin → iCloud Drive</b> (tai AirDrop toiselle laitteelle).</li>
+        <li>Avaa sovellus toisella laitteella (sama osoite) ja <b>Palauta varmuuskopiosta</b> → valitse sama tiedosto iCloud Drivesta.</li>
+        <li>Toista aina kun haluat siirtää uusimmat kirjaukset. Tuore vienti korvaa vanhan tiedoston samalla nimellä, jos valitset niin.</li>
+      </ol>
+      <p class="form-note">Vinkki: lisää sovellus aloitusnäyttöön (Jaa → Lisää Koti-valikkoon) jokaisella laitteella, niin se toimii kuin natiivisovellus ja offline.</p>
     </section>
 
     <section class="settings-block">
@@ -2451,7 +2462,7 @@ function renderSettings() {
     applyAccent();
     toast("Asetukset tallennettu");
   };
-  document.getElementById("expJson").onclick = () => download("kenttalog-varmuuskopio.json", exportJSON(), "application/json");
+  document.getElementById("expJson").onclick = () => shareOrDownload(backupFilename(), exportJSON(), "application/json");
   document.getElementById("impBtn").onclick = () => document.getElementById("impFile").click();
   document.getElementById("impFile").onchange = (e) => {
     const file = e.target.files[0];
@@ -2470,7 +2481,7 @@ function renderSettings() {
     };
     reader.readAsText(file);
   };
-  document.getElementById("expNotes").onclick = () => download("kenttalog-muistiinpanot.json", exportCodeNotes(), "application/json");
+  document.getElementById("expNotes").onclick = () => shareOrDownload("kenttalog-muistiinpanot.json", exportCodeNotes(), "application/json");
   document.getElementById("impNotesBtn").onclick = () => document.getElementById("impNotesFile").click();
   document.getElementById("impNotesFile").onchange = (e) => {
     const file = e.target.files[0];
@@ -2569,6 +2580,27 @@ function download(name, content, type) {
   const a = document.createElement("a");
   a.href = url; a.download = name; a.click();
   URL.revokeObjectURL(url);
+}
+// Aikaleimattu tiedostonimi, jotta varmuuskopiot eivät vahingossa korvaudu.
+function backupFilename() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, "0");
+  return `kenttalog-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.json`;
+}
+// Yritä natiivia jakoa (iOS: Tallenna Tiedostoihin / iCloud Drive, AirDrop);
+// jos selain ei tue tiedostojen jakoa, lataa tiedosto tavalliseen tapaan.
+async function shareOrDownload(name, content, type) {
+  try {
+    const file = new File([content], name, { type });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: "KenttäLog-varmuuskopio" });
+      return;
+    }
+  } catch (e) {
+    if (e && e.name === "AbortError") return; // käyttäjä perui jaon
+    // muuten pudotaan latauksen kautta
+  }
+  download(name, content, type);
 }
 function toast(msg) {
   const t = document.createElement("div");
