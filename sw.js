@@ -1,5 +1,5 @@
 // KenttäLog service worker – offline-tuki välimuistilla.
-const CACHE = "kenttalog-v32";
+const CACHE = "kenttalog-v33";
 const ASSETS = [
   "./",
   "./index.html",
@@ -13,6 +13,25 @@ const ASSETS = [
   "./js/stations.js",
   "./icons/icon.svg",
   "./icons/icon-maskable.svg",
+  "./img/hud/anafylaksia-racer.jpg",
+  "./img/hud/avh-stroke.jpg",
+  "./img/hud/ensiarvio.jpg",
+  "./img/hud/hengitys-breath.jpg",
+  "./img/hud/kipu-socrates.jpg",
+  "./img/hud/kouristelu-captured.jpg",
+  "./img/hud/lapsi-hengitys.jpg",
+  "./img/hud/lapsi-pat.jpg",
+  "./img/hud/lapsi-punaiset-liput.jpg",
+  "./img/hud/master-red-flags.jpg",
+  "./img/hud/obstetriset-hatatilanteet.jpg",
+  "./img/hud/paansarky.jpg",
+  "./img/hud/raskaus-pregnant.jpg",
+  "./img/hud/rintakipu-anatomia.jpg",
+  "./img/hud/rintakipu-matriisi.jpg",
+  "./img/hud/selkakipu.jpg",
+  "./img/hud/tajuttomuus-faint.jpg",
+  "./img/hud/vatsakipu-anatomia.jpg",
+  "./img/hud/vatsakipu-matriisi.jpg",
 ];
 
 self.addEventListener("install", (e) => {

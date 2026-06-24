@@ -532,6 +532,21 @@ a { color: inherit; text-decoration: none; }
 .aid[open] summary::after { content: "－"; }
 .aid ul { margin: 0; padding: 0 16px 14px 30px; }
 .aid li { margin: 5px 0; font-size: .92rem; }
+.aid-img { display: block; width: calc(100% - 28px); margin: 0 14px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border); cursor: zoom-in; }
+
+/* ---------- Kliininen kenttäopas (kuvakortit) ---------- */
+.fg-group .fg-cards { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 14px; }
+.hud-fig { margin: 0; }
+.hud-img { display: block; width: 100%; border-radius: var(--radius-sm); border: 1px solid var(--border); cursor: zoom-in; background: #fff; }
+.hud-fig figcaption { color: var(--muted); font-size: .82rem; margin-top: 5px; }
+.g-hud { margin-top: 10px; }
+.g-hud summary { cursor: pointer; font-weight: 700; font-size: .88rem; color: var(--primary); }
+.g-hud .hud-fig { margin-top: 10px; }
+
+/* ---------- Lightbox (kuvan suurennus) ---------- */
+.lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.9); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 16px; cursor: zoom-out; }
+.lightbox img { max-width: 100%; max-height: 100%; border-radius: var(--radius-sm); object-fit: contain; }
+.lightbox-close { position: fixed; top: calc(env(safe-area-inset-top) + 12px); right: 16px; width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,.15); color: #fff; border: none; font-size: 1.5rem; cursor: pointer; }
 
 /* ---------- Toast ---------- */
 .toast { position: fixed; bottom: calc(var(--tabbar-h) + 16px); left: 50%; transform: translateX(-50%) translateY(20px); background: var(--elevated); color: var(--text); border: 1px solid var(--border); padding: 11px 20px; border-radius: 999px; font-size: .9rem; font-weight: 700; opacity: 0; transition: all .25s; z-index: 60; box-shadow: var(--shadow-lg); }

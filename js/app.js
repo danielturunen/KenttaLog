@@ -228,6 +228,7 @@ function route() {
     case "report": return renderReport();
     case "weekreport": return renderWeekReport();
     case "portfolio": return renderPortfolio();
+    case "fieldguide": return renderFieldGuide();
     case "ekg": return renderEkg();
     case "settings": return renderSettings();
     default: return renderHome();
@@ -240,7 +241,7 @@ function parseHash(hash) {
 }
 
 function setActiveTab(path) {
-  const tab = ["shift", "summary"].includes(path) ? "home" : (["report", "weekreport", "portfolio", "ekg"].includes(path) ? "tools" : path);
+  const tab = ["shift", "summary"].includes(path) ? "home" : (["report", "weekreport", "portfolio", "fieldguide", "ekg"].includes(path) ? "tools" : path);
   document.querySelectorAll(".tabbar a").forEach((a) => {
     a.classList.toggle("active", a.dataset.tab === tab);
   });
@@ -1089,6 +1090,27 @@ const GUIDE_GROUP = {
   pel: { focus: "Pelastusjohtoinen", primary: "ab", ab: ["Oma turvallisuus ja työnjako viranomaisten kesken", "Potilaiden triage ja ensihoidon priorisointi", "Tilannekuva ja raportointi johdolle"], cd: ["Pienemmässä tilanteessa systemaattinen arvio", ...GUIDE_BASE_CD] },
   pol: { focus: "Poliisijohtoinen", primary: "ab", ab: ["Oma turvallisuus ensin; toimi vasta kun kohde on poliisin turvaama", "cABCDE ja ulkoisen vuodon hallinta", "Dokumentoi löydökset huolellisesti"], cd: ["Vakaa potilas: systemaattinen arvio ja jatko", ...GUIDE_BASE_CD] },
 };
+// Kenttäoppaan kuvakortit per tehtäväkoodi (näkyvät keikkalomakkeen ohjeessa).
+const HUD_BASE = "./img/hud/";
+const HUD_CODE = {
+  "702": [["tajuttomuus-faint.jpg", "Tajuttomuus & lyhistyminen (FAINT)"]],
+  "703": [["hengitys-breath.jpg", "Hengitysvaikeus (BREATH) & auskultaatio"]],
+  "704": [["rintakipu-anatomia.jpg", "Rintakivun anatomia"], ["rintakipu-matriisi.jpg", "Rintakivun erotusdiagnostiikka"]],
+  "706": [["avh-stroke.jpg", "Aivoverenkiertohäiriö (STROKE) & FAST"]],
+  "772": [["kouristelu-captured.jpg", "Kouristelu (CAPTURED)"]],
+  "773": [["anafylaksia-racer.jpg", "Anafylaksia (RACER)"]],
+  "781": [["vatsakipu-anatomia.jpg", "Vatsakivun anatomia"], ["vatsakipu-matriisi.jpg", "Vatsakivun erotusdiagnostiikka"]],
+  "782": [["paansarky.jpg", "Päänsäryn aikajana ja punaiset liput"]],
+  "783": [["selkakipu.jpg", "Selkäkivun erotusdiagnostiikka"]],
+  "791": [["raskaus-pregnant.jpg", "Raskausajan arviointi (PREGNANT)"], ["obstetriset-hatatilanteet.jpg", "Obstetriset hätätilanteet"]],
+};
+function hudCardsHtml(code) {
+  const cards = HUD_CODE[(code || "").toUpperCase()];
+  if (!cards) return "";
+  return `<details class="g-sec g-hud"><summary>📋 Kenttäoppaan kortit (${cards.length})</summary>
+    ${cards.map(([f, t]) => `<figure class="hud-fig"><img class="hud-img" src="${HUD_BASE}${f}" alt="${esc(t)}" loading="lazy"><figcaption>${esc(t)}</figcaption></figure>`).join("")}
+  </details>`;
+}
 function codeGuidance(code) {
   code = (code || "").toUpperCase();
   const info = CODE_MAP.get(code);
@@ -1116,6 +1138,7 @@ function guidanceHtml(code, urgency) {
   const what = info?.what ? `<p class="g-what">${esc(info.what)}</p>` : "";
   const assess = info?.assess?.length ? `<div class="g-sec"><h4>Keskeinen arvio</h4>${list(info.assess)}</div>` : "";
   const note = `<p class="g-note">Yleistä, itse koostettua ensihoidon tietoa (lähteinä mm. StatPearls, ERC, AHA/ASA, WHO). Noudata alueellista hoito-ohjetta – ei lääkeannoksia, ei korvaa virallista ohjetta.</p>`;
+  const hud = hudCardsHtml(code);
 
   if (tier === "ab") {
     return `<details class="guidance g-acute" open>
@@ -1125,6 +1148,7 @@ function guidanceHtml(code, urgency) {
         <div class="g-tier g-ab"><h4>Toimi heti – painopisteet</h4>${list(g.ab)}</div>
         ${info?.red?.length ? `<div class="g-sec g-redflags"><h4>⚠️ Tunnista / sulje pois heti</h4>${list(info.red)}</div>` : ""}
         ${assess}
+        ${hud}
         ${note}
       </div>
     </details>`;
@@ -1137,6 +1161,7 @@ function guidanceHtml(code, urgency) {
         <div class="g-tier g-cd"><h4>Systemaattinen ote</h4>${list(g.cd)}</div>
         ${info?.red?.length ? `<div class="g-sec g-redflags"><h4>⚠️ Sulje pois ennen kuin hoidat kiireettömänä</h4>${list(info.red)}</div>` : ""}
         ${assess}
+        ${hud}
         ${note}
       </div>
     </details>`;
@@ -1151,6 +1176,7 @@ function guidanceHtml(code, urgency) {
       <div class="g-tier g-cd"><h4>C / D · vakaa – systemaattinen ote</h4>${list(g.cd)}</div>
       ${info?.red?.length ? `<div class="g-sec g-redflags"><h4>⚠️ Hälyttävät löydökset / pois suljettavat</h4>${list(info.red)}</div>` : ""}
       ${assess}
+      ${hud}
       ${note}
     </div>
   </details>`;
@@ -1615,37 +1641,86 @@ function openCodeNote(code, after) {
 }
 
 // Yleisesti opetetut kliiniset muistilistat (ei Ensihoito-oppaasta kopioitua sisältöä).
+const HUD = "./img/hud/";
 const MEMORY_AIDS = [
-  { t: "cABCDE – ensiarvio", items: [
-    "c – Massiivin ulkoisen verenvuodon tyrehdytys (kiristysside / painepakkaus)",
-    "A – Ilmatie ja rangan tuenta",
-    "B – Hengitys: taajuus, SpO₂, hengitysäänet",
-    "C – Verenkierto: pulssi, RR, ihon lämpö, vuodot",
-    "D – Tajunta: GCS, pupillat, verensokeri, raajojen liike",
-    "E – Paljastus: vammat, iho, lämpötila (estä jäähtyminen)",
-  ]},
-  { t: "ISBAR – raportointi ja luovutus", items: [
-    "I – Tunnista: oma nimi/yksikkö ja potilas",
-    "S – Tilanne: nykyinen ongelma ja kiireellisyys",
-    "B – Tausta: perussairaudet, lääkitys, tapahtumat",
-    "A – Arvio: peruselintoiminnot, työdiagnoosi",
-    "R – Toimintaehdotus: mitä pyydät / suosittelet",
-  ]},
   { t: "SAMPLE – esitiedot", items: [
     "S – Oireet (Symptoms)",
     "A – Allergiat",
-    "M – Lääkitys (Medication)",
+    "M – Lääkitys (Medication) – huom. verenohennus, NSAID",
     "P – Perussairaudet (Past history)",
     "L – Viimeksi syöty/juotu (Last intake)",
     "E – Tapahtumat ennen oireita (Events)",
   ]},
-  { t: "OPQRST – kipuanamneesi", items: [
-    "O – Alku (Onset)",
-    "P – Provosoivat/lievittävät tekijät",
-    "Q – Laatu (Quality)",
-    "R – Säteily (Radiation)",
-    "S – Voimakkuus (Severity, VAS 0–10)",
-    "T – Kesto/ajallisuus (Time)",
+  { t: "SOCRATES / OPQRST – kipuanamneesi", img: HUD + "kipu-socrates.jpg", items: [
+    "S – Sijainti: missä kipu on?",
+    "O – Alku: äkillinen vai vähittäinen?",
+    "C – Luonne: terävä, puristava, repivä?",
+    "R – Säteily: mihin kipu heijastuu?",
+    "A – Muut oireet: pahoinvointi, hengenahdistus?",
+    "T – Aikajana: jatkuva vai aaltoileva?",
+    "E – Helpottaa/pahentaa: liike, lepo, lääke?",
+    "S – Voimakkuus: VAS 0–10",
+  ]},
+  { t: "BREATH – hengitysvaikeus", img: HUD + "hengitys-breath.jpg", items: [
+    "B – Tausta (Background): COPD, sydänvika",
+    "R – Alku (Resp onset): äkillinen vs. vähittäinen",
+    "E – Pahentavat tekijät: rasitus, makuuasento",
+    "A – Muut oireet: yskä, rintakipu, kuume",
+    "T – Ajoitus: jatkuva, yöllinen",
+    "H – Hoidot: inhalaattorit, happi, diureetit",
+  ]},
+  { t: "FAINT – pyörtyminen / synkopee", img: HUD + "tajuttomuus-faint.jpg", items: [
+    "F – Piirteet (Features): kollapsin kulku",
+    "A – Muut oireet (Associated symptoms)",
+    "I – Vammat (Injuries from fall)",
+    "N – Neurohistoria (Neuro history)",
+    "T – Laukaisijat (Triggers)",
+  ]},
+  { t: "CAPTURED – kouristelu", img: HUD + "kouristelu-captured.jpg", items: [
+    "C – Kohtauksen piirteet",
+    "A – Edeltävä toiminta",
+    "P – Sairaudet",
+    "T – Ajoitus",
+    "U – Virtsankarkailu",
+    "R – Lääkkeet / huumeet",
+    "E – Ensiaputoimet",
+    "D – Silminnäkijöiden tiedot",
+    "AINA: tarkista verensokeri kouristavalta!",
+  ]},
+  { t: "STROKE – aivoverenkiertohäiriö", img: HUD + "avh-stroke.jpg", items: [
+    "S – Oireiden alku (Symptom onset)",
+    "T – Heikkouden tyyppi: fokaalinen vs. yleinen",
+    "R – Riskitekijät: eteisvärinä, verenpaine, diabetes",
+    "O – Muut neuro-oireet: puhe, näköhäiriöt",
+    "K – Tunnetut sairaudet",
+    "E – Tutkimuslöydökset (FAST-testi)",
+  ]},
+  { t: "RACER – anafylaksia", img: HUD + "anafylaksia-racer.jpg", items: [
+    "R – Reagoinnin nopeus: sekunteja/minuutteja = anafylaksia",
+    "A – Ilmatiet: turvotus, käheys (hengenvaara!)",
+    "C – Verenkierto: hypotensio, takykardia, synkopee",
+    "E – Altistus: ruoka, lääke, hyönteisen pisto",
+    "R – Hengitysoireet: vinkuna, hengenahdistus",
+    "Vihje: anafylaksia voi esiintyä ilman iho-oireita.",
+  ]},
+  { t: "PAT / TICLS – lapsen arviointikolmio", img: HUD + "lapsi-pat.jpg", items: [
+    "Arviointikolmio: ulkonäkö – hengitystyö – verenkierto",
+    "T – Tone: veltto vai jäntevä?",
+    "I – Interactiveness: reagoiko ympäristöön?",
+    "C – Consolability: onko lohdutettavissa?",
+    "L – Look/gaze: katsekontakti",
+    "S – Speech/cry: heikko vai kimeä itku?",
+    "Tee yleisvaikutelma ovelta ennen lapseen koskemista.",
+  ]},
+  { t: "PREGNANT – raskausajan arviointi", img: HUD + "raskaus-pregnant.jpg", items: [
+    "P – Raskaushistoria (Gravida/Para, aiemmat sektiot)",
+    "R – Nykyiset oireet: kipu, supistukset, vuoto",
+    "E – Tapahtumat: vedenmeno, trauma, infektiot",
+    "G – Raskausviikot, sikiön liikkeet",
+    "N – Oireiden luonne: kivun sijainti, vuodon määrä ja väri",
+    "A – Sairaudet: verenpaine, diabetes, lääkitykset",
+    "N – Neuro/systeemiset: päänsärky, näköhäiriöt = pre-eklampsia?",
+    "T – Ajoitus ja hoidot: milloin alkoi?",
   ]},
 ];
 
@@ -1671,9 +1746,15 @@ function renderTools() {
     </section>
 
     <section class="settings-block">
+      <h2>Kliininen kenttäopas</h2>
+      <p class="muted">Oirekohtaiset arviointimatriisit, anatomia ja punaiset liput visuaalisina kortteina. Yleistä, itse koostettua tietoa – noudata alueellista hoito-ohjetta.</p>
+      <a class="btn primary" href="#fieldguide">Avaa kenttäopas →</a>
+    </section>
+
+    <section class="settings-block">
       <h2>Muistilistat</h2>
-      <p class="muted">Yleiset kliiniset muistikehykset nopeaan kertaukseen.</p>
-      ${MEMORY_AIDS.map((m) => `<details class="aid"><summary>${esc(m.t)}</summary><ul>${m.items.map((i) => `<li>${esc(i)}</li>`).join("")}</ul></details>`).join("")}
+      <p class="muted">Yleiset kliiniset muistikehykset nopeaan kertaukseen. Avaa kortti nähdäksesi myös visuaalisen version.</p>
+      ${MEMORY_AIDS.map((m) => `<details class="aid"><summary>${esc(m.t)}</summary><ul>${m.items.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>${m.img ? `<img class="aid-img" src="${esc(m.img)}" alt="${esc(m.t)}" loading="lazy">` : ""}</details>`).join("")}
     </section>
 
     <section class="settings-block">
@@ -1966,6 +2047,74 @@ function shiftTypeText(s) {
   if (s.type === "day") return "Päivä 9–21";
   if (s.type === "night") return "Yö 21–9";
   return `${s.startTime || ""}–${s.endTime || ""}`;
+}
+
+// ---------- Kliininen kenttäopas (visuaaliset oirekortit) ----------
+// Kuvat ovat itse koostettuja, yleisluontoisia arviointikortteja (ei oppikirjasisältöä).
+const FIELD_GUIDE = [
+  { t: "Ensiarvio ja punaiset liput", cards: [
+    ["ensiarvio.jpg", "Hengenvaarojen poissulku (ABCDE) & kliininen päättely (SOAP)"],
+    ["master-red-flags.jpg", "Master red flag – yhteenveto henkeä uhkaavista löydöksistä"],
+  ]},
+  { t: "Kipu", cards: [
+    ["kipu-socrates.jpg", "Kivun arviointi (SOCRATES) & esitiedot (AMPLE)"],
+  ]},
+  { t: "Rintakipu (704)", cards: [
+    ["rintakipu-anatomia.jpg", "Rintakivun anatomia"],
+    ["rintakipu-matriisi.jpg", "Rintakivun diagnostinen matriisi"],
+  ]},
+  { t: "Vatsakipu (781)", cards: [
+    ["vatsakipu-anatomia.jpg", "Vatsakivun anatomia"],
+    ["vatsakipu-matriisi.jpg", "Vatsakivun diagnostinen matriisi"],
+  ]},
+  { t: "Pää- ja selkäkipu (782/783)", cards: [
+    ["paansarky.jpg", "Päänsäryn aikajana ja hälytysmerkit"],
+    ["selkakipu.jpg", "Selkäkivun erotusdiagnostiikka"],
+  ]},
+  { t: "Hengitysvaikeus (703)", cards: [
+    ["hengitys-breath.jpg", "Hengenahdistus (BREATH) & auskultaatiolöydökset"],
+  ]},
+  { t: "Tajuttomuus ja kouristelu (702/772)", cards: [
+    ["tajuttomuus-faint.jpg", "Tajuttomuus ja lyhistyminen (FAINT)"],
+    ["kouristelu-captured.jpg", "Kouristuskohtaukset (CAPTURED)"],
+  ]},
+  { t: "AVH ja anafylaksia (706/773)", cards: [
+    ["avh-stroke.jpg", "Aivoverenkiertohäiriö (STROKE) & FAST"],
+    ["anafylaksia-racer.jpg", "Anafylaksia ja allergiset reaktiot (RACER)"],
+  ]},
+  { t: "Lapsipotilas", cards: [
+    ["lapsi-pat.jpg", "Lapsipotilaan arviointikolmio (PAT / TICLS)"],
+    ["lapsi-hengitys.jpg", "Lasten hengitysvaikeus ja kuume"],
+    ["lapsi-punaiset-liput.jpg", "Lapsipotilaan punaiset liput"],
+  ]},
+  { t: "Raskaus ja synnytys (791)", cards: [
+    ["raskaus-pregnant.jpg", "Raskausajan arviointi (PREGNANT)"],
+    ["obstetriset-hatatilanteet.jpg", "Obstetriset hätätilanteet"],
+  ]},
+];
+function renderFieldGuide() {
+  app.innerHTML = `
+    <header class="page-head"><a class="back" href="#tools">‹ Työkalut</a><h1>Kliininen kenttäopas</h1></header>
+    <p class="muted">Oirekohtaiset arviointimatriisit, anatomia ja punaiset liput. Yleistä, itse koostettua tietoa nopeaan kertaukseen – ei korvaa virallista hoito-ohjetta eikä sisällä lääkeannoksia. Napauta kuvaa suurentaaksesi.</p>
+    ${FIELD_GUIDE.map((g) => `
+      <details class="aid fg-group" open>
+        <summary>${esc(g.t)}</summary>
+        <div class="fg-cards">
+          ${g.cards.map(([f, t]) => `<figure class="hud-fig"><img class="hud-img" src="${HUD_BASE}${f}" alt="${esc(t)}" loading="lazy" data-full="${HUD_BASE}${f}"><figcaption>${esc(t)}</figcaption></figure>`).join("")}
+        </div>
+      </details>`).join("")}
+    <p class="form-note">Kuvat: itse koostettuja arviointikortteja. Lähteinä yleiset kansainväliset ensihoidon muistisäännöt ja avoimet lähteet.</p>
+  `;
+  app.querySelectorAll(".hud-img").forEach((img) => {
+    img.onclick = () => openImageLightbox(img.dataset.full, img.alt);
+  });
+}
+function openImageLightbox(src, alt) {
+  const box = document.createElement("div");
+  box.className = "lightbox";
+  box.innerHTML = `<img src="${esc(src)}" alt="${esc(alt || "")}"><button class="lightbox-close" aria-label="Sulje">×</button>`;
+  box.onclick = () => box.remove();
+  document.body.appendChild(box);
 }
 
 // ---------- CV / Portfolio (tulostettava osaamisyhteenveto) ----------
