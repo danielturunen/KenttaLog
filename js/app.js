@@ -9,6 +9,7 @@ import {
 import { CODE_GROUPS, CODE_MAP, ALL_CODES, URGENCY, PROCEDURES, X_SUBCODES } from "./codes.js";
 import { codeInfo } from "./codeinfo.js";
 import { computeStats, shiftHours, DAYPARTS, WEEKDAYS } from "./stats.js";
+import { ekgWaveSvg } from "./ekgwave.js";
 import { STATIONS, stationLabel, ALL_UNITS, findStation, stationColor, DEFAULT_ACCENT, unitLevel } from "./stations.js";
 
 // ---------- Lista + oma syöte -valitsimet (asema / yksikkö) ----------
@@ -2265,6 +2266,7 @@ function renderEkg() {
   const card = deck.find((c) => c.id === ekgState.queue[ekgState.idx]);
   const prog = getEkgProgress();
   const box = prog[card.id] || 0;
+  const wave = ekgWaveSvg(card.id);
   app.innerHTML = `
     <header class="page-head"><a class="back" href="#tools">‹ Työkalut</a><h1>EKG-kortit</h1></header>
     <div class="ekg-top">
@@ -2274,11 +2276,14 @@ function renderEkg() {
     <div class="bartrack ekg-bar"><div class="barfill" style="width:${Math.round((ekgState.idx / total) * 100)}%"></div></div>
     <button type="button" class="ekg-card ${ekgState.flipped ? "flipped" : ""}" id="ekg-flip">
       <div class="ekg-box">Taso ${box}/5</div>
-      ${card.img ? `<img class="ekg-img" src="${esc(card.img)}" alt="">` : ""}
-      <div class="ekg-q">${esc(card.q)}</div>
-      ${ekgState.flipped
-        ? `<div class="ekg-a">${esc(card.a || "")}</div>`
-        : `<div class="ekg-hint">Napauta nähdäksesi vastauksen</div>`}
+      ${wave ? `<div class="ekg-wave">${wave}</div>` : (card.img ? `<img class="ekg-img" src="${esc(card.img)}" alt="">` : "")}
+      ${wave
+        ? (ekgState.flipped
+            ? `<div class="ekg-q">${esc(card.q)}</div><div class="ekg-a">${esc(card.a || "")}</div>`
+            : `<div class="ekg-q ekg-prompt">Mikä rytmi?</div><div class="ekg-hint">Napauta nähdäksesi vastauksen</div>`)
+        : `<div class="ekg-q">${esc(card.q)}</div>${ekgState.flipped
+            ? `<div class="ekg-a">${esc(card.a || "")}</div>`
+            : `<div class="ekg-hint">Napauta nähdäksesi vastauksen</div>`}`}
     </button>
     ${ekgState.flipped ? `
       <div class="ekg-actions">
