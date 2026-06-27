@@ -1814,6 +1814,30 @@ function renderTools() {
     </section>
 
     <section class="settings-block">
+      <h2>Lapsen painoarvio</h2>
+      <p class="muted">Karkea kenttämuisti, kun lapsen painoa ei tiedetä. Oikea paino (vanhemmalta, potilaalta, rannekkeesta tai punnitsemalla) voittaa aina arvion.</p>
+      <div class="row">
+        <label>Ikä (vuotta)<input type="number" id="pw-age" inputmode="decimal" placeholder="7"></label>
+      </div>
+      <div class="calc-out" id="pw-out">Syötä ikä</div>
+      <details class="aid gcs-info">
+        <summary>Muistisääntö ja taulukko</summary>
+        <p class="form-note" style="margin-top:8px"><b>Parittomat vuodet + 5 kg.</b> Sormilla: ikä +2 v → paino +5 kg.</p>
+        <ul>
+          <li>1 v ≈ 10 kg</li>
+          <li>3 v ≈ 15 kg</li>
+          <li>5 v ≈ 20 kg</li>
+          <li>7 v ≈ 25 kg</li>
+          <li>9 v ≈ 30 kg</li>
+          <li>11 v ≈ 35 kg</li>
+          <li>13 v ≈ 40 kg</li>
+          <li>15 v ≈ 45 kg</li>
+        </ul>
+        <p class="form-note">Kaava: paino ≈ 10 + 2,5 × (ikä − 1). APLS: 1–5 v = 2 × ikä + 8; 6–12 v = 3 × ikä + 7. Eri kaavoissa on pieniä eroja – tämä on vain karkea arvio.</p>
+      </details>
+    </section>
+
+    <section class="settings-block">
       <h2>Annoslaskuri</h2>
       <div class="row">
         <label>Paino (kg)<input type="number" id="d-w" inputmode="decimal" placeholder="80"></label>
@@ -1861,6 +1885,21 @@ function setupCalculators() {
   };
   ["gcs-e", "gcs-v", "gcs-m"].forEach((id) => document.getElementById(id).onchange = gcs);
   gcs();
+
+  const pweight = () => {
+    const out = document.getElementById("pw-out");
+    const age = parseFloat(val("pw-age"));
+    if (isNaN(age) || age <= 0) { out.textContent = "Syötä ikä"; return; }
+    if (age < 1) { out.innerHTML = `Vauva (alle 1 v): punnitse tai käytä imeväiskaavaa`; return; }
+    const half = (n) => Math.round(n * 2) / 2;
+    const field = half(10 + 2.5 * (age - 1));
+    const apls = age <= 5 ? 2 * age + 8 : age <= 12 ? 3 * age + 7 : null;
+    let txt = `≈ ${field} kg <small>(kenttämuisti)</small>`;
+    if (apls) txt += ` · ${half(apls)} kg <small>(APLS)</small>`;
+    else txt += ` <small>(yli 12 v: lähellä aikuista, arvioi yksilöllisesti)</small>`;
+    out.innerHTML = txt;
+  };
+  document.getElementById("pw-age").oninput = pweight;
 
   const dose = () => {
     const w = parseFloat(val("d-w")), mgkg = parseFloat(val("d-mgkg")), conc = parseFloat(val("d-conc"));
