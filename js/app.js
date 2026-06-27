@@ -1772,16 +1772,45 @@ function renderTools() {
       <h2>GCS-laskuri</h2>
       <div class="row">
         <label>Silmät (E)
-          <select id="gcs-e">${[4,3,2,1].map((n)=>`<option value="${n}">${n}</option>`).join("")}</select>
+          <select id="gcs-e">
+            <option value="4">4 – Avaa spontaanisti</option>
+            <option value="3">3 – Avaa puheelle</option>
+            <option value="2">2 – Avaa kivulle</option>
+            <option value="1">1 – Ei avaa</option>
+          </select>
         </label>
         <label>Puhe (V)
-          <select id="gcs-v">${[5,4,3,2,1].map((n)=>`<option value="${n}">${n}</option>`).join("")}</select>
+          <select id="gcs-v">
+            <option value="5">5 – Orientoitunut</option>
+            <option value="4">4 – Sekava puhe</option>
+            <option value="3">3 – Irrallisia sanoja</option>
+            <option value="2">2 – Ääntelyä</option>
+            <option value="1">1 – Ei ääntä</option>
+          </select>
         </label>
         <label>Liike (M)
-          <select id="gcs-m">${[6,5,4,3,2,1].map((n)=>`<option value="${n}">${n}</option>`).join("")}</select>
+          <select id="gcs-m">
+            <option value="6">6 – Noudattaa kehotusta</option>
+            <option value="5">5 – Paikantaa kivun</option>
+            <option value="4">4 – Väistää kipua</option>
+            <option value="3">3 – Koukistus (fleksio)</option>
+            <option value="2">2 – Ojennus (ekstensio)</option>
+            <option value="1">1 – Ei vastetta</option>
+          </select>
         </label>
       </div>
       <div class="calc-out" id="gcs-out">GCS 15</div>
+      <details class="aid gcs-info">
+        <summary>Mitä pistemäärä tarkoittaa?</summary>
+        <ul>
+          <li><b>15</b> – täysin tajuissaan ja orientoitunut (normaali)</li>
+          <li><b>13–14</b> – lievä tajunnanlasku (esim. lievä aivovamma)</li>
+          <li><b>9–12</b> – keskivaikea tajunnanlasku; tiivis seuranta</li>
+          <li><b>≤ 8</b> – vaikea tajuttomuus: ilmatie uhattuna → varmista hapetus ja harkitse ilmatien turvaamista</li>
+          <li><b>3</b> – matalin mahdollinen pistemäärä (syvä tajuttomuus)</li>
+        </ul>
+        <p class="form-note">Kirjaa myös osapisteet (esim. GCS 10 = E3 V3 M4). Huomioi vireyttä alentavat tekijät: matala verensokeri, päihteet, hypoksia, jälkitila.</p>
+      </details>
     </section>
 
     <section class="settings-block">
@@ -1819,11 +1848,19 @@ function renderTools() {
 }
 
 function setupCalculators() {
+  const gcsBand = (t) => {
+    if (t >= 15) return "täysin tajuissaan";
+    if (t >= 13) return "lievä tajunnanlasku";
+    if (t >= 9) return "keskivaikea tajunnanlasku";
+    return "vaikea – ilmatie uhattuna";
+  };
   const gcs = () => {
-    const t = +val("gcs-e") + +val("gcs-v") + +val("gcs-m");
-    document.getElementById("gcs-out").textContent = `GCS ${t}`;
+    const e = +val("gcs-e"), v = +val("gcs-v"), m = +val("gcs-m");
+    const t = e + v + m;
+    document.getElementById("gcs-out").innerHTML = `GCS ${t} <small>(E${e} V${v} M${m})</small> – ${gcsBand(t)}`;
   };
   ["gcs-e", "gcs-v", "gcs-m"].forEach((id) => document.getElementById(id).onchange = gcs);
+  gcs();
 
   const dose = () => {
     const w = parseFloat(val("d-w")), mgkg = parseFloat(val("d-mgkg")), conc = parseFloat(val("d-conc"));

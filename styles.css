@@ -512,6 +512,8 @@ a { color: inherit; text-decoration: none; }
 
 /* ---------- Calculators & quiz ---------- */
 .calc-out { margin-top: 10px; padding: 12px 14px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--primary) 14%, var(--surface)); border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border)); font-weight: 800; font-size: 1.1rem; }
+.calc-out small { font-weight: 600; color: var(--muted); font-size: .82rem; }
+.gcs-info { margin-top: 10px; }
 .news-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .news-grid label { display: block; font-weight: 700; font-size: .85rem; }
 .news-grid input, .news-grid select { margin-top: 5px; }
