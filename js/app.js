@@ -1573,6 +1573,15 @@ function leadColor(k) {
 }
 
 // ---------- Koodikirjasto ----------
+// X-koodin alakoodit (tarkenteet) listana, esim. X-5 -> X-51, X-52.
+function subcodesHtml(code, q) {
+  const subs = X_SUBCODES[code];
+  if (!subs) return "";
+  const matched = q ? subs.filter(([c, n]) => c.toLowerCase().includes(q) || n.toLowerCase().includes(q)) : [];
+  const show = matched.length ? matched : subs;
+  return `<div class="subcodes">${show.map(([c, n]) =>
+    `<div class="subcode"><span class="subcode-c">${esc(c)}</span><span class="subcode-n">${esc(n)}</span></div>`).join("")}</div>`;
+}
 let codeQuery = "";
 function renderCodes() {
   const q = codeQuery.toLowerCase();
@@ -1582,11 +1591,15 @@ function renderCodes() {
     <a class="info-banner" href="${INFO_BASE}" target="_blank" rel="noopener">ⓘ Avaa koodien lisätiedot ensihoito-online.fi:ssä →</a>
     ${CODE_GROUPS.map((g) => {
       const cats = g.categories.map((cat) => {
-        const codes = cat.codes.filter(([code, name]) =>
-          !q || code.toLowerCase().includes(q) || name.toLowerCase().includes(q) || cat.title.toLowerCase().includes(q));
+        const codes = cat.codes.filter(([code, name]) => {
+          if (!q) return true;
+          if (code.toLowerCase().includes(q) || name.toLowerCase().includes(q) || cat.title.toLowerCase().includes(q)) return true;
+          const subs = X_SUBCODES[code];
+          return subs && subs.some(([c, n]) => c.toLowerCase().includes(q) || n.toLowerCase().includes(q));
+        });
         if (!codes.length) return "";
         return `<div class="codecat"><h3>${esc(cat.title)}</h3>${codes.map(([code, name]) =>
-          `<button type="button" class="coderow" data-code="${esc(code)}"><span class="code" style="--lc:${g.color}">${esc(code)}</span><span class="cname">${esc(name)}</span>${getCodeNote(code) ? `<span class="coderow-note">📝</span>` : ""}<span class="coderow-go">›</span></button>`).join("")}</div>`;
+          `<button type="button" class="coderow" data-code="${esc(code)}"><span class="code" style="--lc:${g.color}">${esc(code)}</span><span class="cname">${esc(name)}</span>${getCodeNote(code) ? `<span class="coderow-note">📝</span>` : ""}<span class="coderow-go">›</span></button>${subcodesHtml(code, q)}`).join("")}</div>`;
       }).join("");
       if (!cats) return "";
       return `<section class="codegroup"><div class="grouphead" style="--lc:${g.color}">${esc(g.label)}</div>${cats}</section>`;
@@ -1606,6 +1619,7 @@ function openCodeNote(code, after) {
   openModal(`${code}${info ? " · " + info.name : ""}`, `
     ${info ? `<p class="muted">${esc(info.lead)} · ${esc(info.category)}</p>` : ""}
     <a class="info-link" href="${infoUrlForCode(code)}" target="_blank" rel="noopener">ⓘ Avaa virallinen lisätieto (ensihoito-online.fi)</a>
+    ${X_SUBCODES[code] ? `<div class="subcodes-block"><div class="subcodes-h">Tarkenteet (alakoodit)</div>${subcodesHtml(code, "")}</div>` : ""}
     ${guidanceHtml(code)}
     <label style="margin-top:12px">Hoito-ohje / muistiinpano
       <textarea id="cn-text" rows="10" placeholder="Kirjoita tai liitä omat muistilistasi / hoito-ohjeesi tästä tehtävästä.">${esc(note)}</textarea>
