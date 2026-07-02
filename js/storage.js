@@ -63,9 +63,21 @@ export function load() {
   return cache;
 }
 
+let quotaWarned = false;
 export function save() {
   if (!cache) return;
-  localStorage.setItem(KEY, JSON.stringify(cache));
+  try {
+    localStorage.setItem(KEY, JSON.stringify(cache));
+  } catch (e) {
+    // Tyypillisesti QuotaExceededError: selaimen tallennustila (~5 Mt) täynnä,
+    // yleensä kuvaliitteiden takia. Kerro käyttäjälle heti – muuten muutokset
+    // katoavat hiljaa sivun sulkeutuessa.
+    console.error("Tallennus localStorageen epäonnistui", e);
+    if (!quotaWarned) {
+      quotaWarned = true;
+      alert("Tallennustila on täynnä – viimeisin muutos EI tallentunut pysyvästi!\n\nPoista kuvaliitteitä tai vanhoja keikkoja ja yritä uudelleen. Ota varmuuskopio talteen (Asetukset → Vie / jaa varmuuskopio).");
+    }
+  }
 }
 
 export function getData() {

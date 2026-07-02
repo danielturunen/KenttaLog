@@ -578,7 +578,7 @@ a { color: inherit; text-decoration: none; }
 /* ---------- Photo attachment ---------- */
 .photo-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .photo-thumb { position: relative; width: 72px; height: 72px; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--border); }
-.photo-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.photo-thumb img { width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; }
 .photo-del {
   position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,.65); color: #fff; border: none;
   width: 20px; height: 20px; border-radius: 50%; font-size: .75rem; cursor: pointer; line-height: 1;

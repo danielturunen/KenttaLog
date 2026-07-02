@@ -801,7 +801,7 @@ function openCallForm(shiftId, existing) {
     </label>
     <label>Kuvat (vapaaehtoinen, ei potilastietoja)
       <input type="file" id="c-photo" accept="image/*" multiple capture="environment">
-      <div class="photo-grid" id="c-photos">${(c.photos || []).map((p, i) => `<div class="photo-thumb"><img src="${esc(p)}" alt=""><button type="button" class="photo-del" data-pi="${i}">×</button></div>`).join("")}</div>
+      <div class="photo-grid" id="c-photos"></div>
       <p class="form-note">Esim. rytmistrippi, tilannekuva (anonymisoitu). Tallentuu tähän laitteeseen.</p>
     </label>
   `, {
@@ -954,20 +954,47 @@ function openCallForm(shiftId, existing) {
   // Kuvaliitteet
   const photosEl = document.getElementById("c-photos");
   const renderPhotos = () => {
-    photosEl.innerHTML = photos.map((p, i) => `<div class="photo-thumb"><img src="${esc(p)}" alt=""><button type="button" class="photo-del" data-pi="${i}">×</button></div>`).join("");
+    photosEl.innerHTML = photos.map((p, i) => `<div class="photo-thumb"><img src="${esc(p)}" alt="" data-pi="${i}"><button type="button" class="photo-del" data-pi="${i}">×</button></div>`).join("");
     photosEl.querySelectorAll(".photo-del").forEach((b) => {
       b.onclick = () => { photos.splice(Number(b.dataset.pi), 1); renderPhotos(); };
     });
+    photosEl.querySelectorAll("img").forEach((im) => {
+      im.onclick = () => openImageLightbox(photos[Number(im.dataset.pi)], "");
+    });
   };
   renderPhotos();
-  document.getElementById("c-photo").onchange = (e) => {
+  document.getElementById("c-photo").onchange = async (e) => {
     for (const file of e.target.files) {
-      const reader = new FileReader();
-      reader.onload = () => { photos.push(reader.result); renderPhotos(); };
-      reader.readAsDataURL(file);
+      try {
+        photos.push(await compressImage(file));
+      } catch {
+        toast("Kuvan lisäys epäonnistui");
+      }
     }
+    renderPhotos();
     e.target.value = "";
   };
+}
+
+// Pienennä ja pakkaa kuva ennen tallennusta: localStorageen mahtuu vain
+// ~5 Mt yhteensä, joten kamerakuvat skaalataan ja muunnetaan JPEG:ksi.
+function compressImage(file, maxDim = 1280, quality = 0.8) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      const w = Math.max(1, Math.round(img.width * scale));
+      const h = Math.max(1, Math.round(img.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Kuvan luku epäonnistui")); };
+    img.src = url;
+  });
 }
 
 function codeHint(code) {
@@ -2204,7 +2231,11 @@ function openImageLightbox(src, alt) {
   const box = document.createElement("div");
   box.className = "lightbox";
   box.innerHTML = `<img src="${esc(src)}" alt="${esc(alt || "")}"><button class="lightbox-close" aria-label="Sulje">×</button>`;
-  box.onclick = () => box.remove();
+  const close = () => { document.removeEventListener("keydown", onKey, true); box.remove(); };
+  // capture-vaihe: Escape sulkee vain lightboxin, ei sen alla olevaa modaalia
+  const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); close(); } };
+  box.onclick = close;
+  document.addEventListener("keydown", onKey, true);
   document.body.appendChild(box);
 }
 
@@ -2320,8 +2351,10 @@ function ekgMastered(deck) {
 let ekgState = null;
 function startEkgSession(deck) {
   const prog = getEkgProgress();
-  const queue = deck.map((c) => ({ id: c.id, box: prog[c.id] || 0 }))
-    .sort((a, b) => (a.box - b.box) || (Math.random() - 0.5))
+  // Kiinteä satunnaisavain ennen lajittelua → johdonmukainen vertailu
+  // (Math.random() suoraan komparaattorissa olisi määrittelemätön).
+  const queue = deck.map((c) => ({ id: c.id, box: prog[c.id] || 0, r: Math.random() }))
+    .sort((a, b) => (a.box - b.box) || (a.r - b.r))
     .map((x) => x.id);
   return { queue, idx: 0, flipped: false };
 }
@@ -2354,6 +2387,12 @@ function renderEkg() {
   }
 
   const card = deck.find((c) => c.id === ekgState.queue[ekgState.idx]);
+  if (!card) {
+    // Pakka muuttui kesken session (esim. varmuuskopion palautus) → uusi kierros
+    ekgState = startEkgSession(deck);
+    renderEkg();
+    return;
+  }
   const prog = getEkgProgress();
   const box = prog[card.id] || 0;
   const wave = ekgWaveSvg(card.id);
@@ -2618,10 +2657,16 @@ function openModal(title, bodyHtml, { onSave, extra } = {}) {
   wrap.onclick = (e) => { if (e.target === wrap) closeModal(); };
   wrap.querySelector("#m-save").onclick = onSave;
   if (extra) wrap.querySelector("#m-extra").onclick = extra.action;
+  wrap._onKey = (e) => { if (e.key === "Escape") closeModal(); };
+  document.addEventListener("keydown", wrap._onKey);
 }
 function closeModal() {
   const wraps = document.querySelectorAll(".modal-wrap");
-  if (wraps.length) wraps[wraps.length - 1].remove();
+  if (wraps.length) {
+    const w = wraps[wraps.length - 1];
+    if (w._onKey) document.removeEventListener("keydown", w._onKey);
+    w.remove();
+  }
   if (!document.querySelectorAll(".modal-wrap").length) document.body.classList.remove("modal-open");
 }
 
