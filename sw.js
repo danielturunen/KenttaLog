@@ -1,5 +1,5 @@
 // KenttäLog service worker – offline-tuki välimuistilla.
-const CACHE = "kenttalog-v39";
+const CACHE = "kenttalog-v40";
 const ASSETS = [
   "./",
   "./index.html",
@@ -36,7 +36,13 @@ const ASSETS = [
 ];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  // Ei skipWaiting-kutsua asennuksessa: uusi versio odottaa, kunnes käyttäjä
+  // hyväksyy päivityksen sovelluksen bannerista (app.js lähettää viestin).
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));
+});
+
+self.addEventListener("message", (e) => {
+  if (e.data === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", (e) => {

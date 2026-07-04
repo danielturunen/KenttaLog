@@ -270,6 +270,7 @@ function renderHome() {
       <button type="button" data-v="calendar" class="${homeView === "calendar" ? "on" : ""}">Kalenteri</button>
     </div>
     ${incompleteCount ? `<button type="button" class="reminder" id="goIncomplete"><span class="rem-ic">⏳</span> <span><b>${incompleteCount}</b> keskeneräistä keikkaa – täydennä loppuun</span><span class="rem-go">›</span></button>` : ""}
+    ${backupReminderHtml(shifts)}
     ${shifts.length === 0 ? emptyState() : ""}
     <div id="home-body"></div>
   `;
@@ -338,6 +339,18 @@ function calendarHtml(shifts) {
       <span><i class="lg custom"></i> Muu</span>
       <span class="muted">Numero = keikat</span>
     </div>`;
+}
+
+// Muistuta varmuuskopiosta, kun dataa on kertynyt eikä kopiota ole otettu
+// kahteen viikkoon (tiedot ovat vain tämän selaimen muistissa).
+function backupReminderHtml(shifts) {
+  if (shifts.length < 3) return "";
+  const last = getSettings().lastBackup || "";
+  if (last) {
+    const days = Math.floor((new Date(today() + "T00:00:00") - new Date(last + "T00:00:00")) / 86400000);
+    if (days < 14) return "";
+  }
+  return `<a class="reminder backup-rem" href="#settings"><span class="rem-ic">💾</span> <span>${last ? "Edellisestä varmuuskopiosta on yli 2 viikkoa" : "Et ole vielä ottanut varmuuskopiota"} – tiedot ovat vain tällä laitteella</span><span class="rem-go">›</span></a>`;
 }
 
 function emptyState() {
@@ -488,9 +501,15 @@ function openShiftForm(existing) {
       danger: true,
       action: () => {
         if (confirm("Poistetaanko vuoro ja sen keikat?")) {
+          const removed = structuredClone(existing);
           deleteShift(existing.id);
           closeModal();
           location.hash = "#/";
+          toast("Vuoro poistettu", {
+            label: "Kumoa",
+            ms: 8000,
+            action: () => { addShift(removed); route(); },
+          });
         }
       },
     } : null,
@@ -848,11 +867,16 @@ function openCallForm(shiftId, existing) {
       label: "Poista keikka",
       danger: true,
       action: () => {
-        if (confirm("Poistetaanko keikka?")) {
-          deleteCall(shiftId, existing.id);
-          closeModal();
-          renderShiftDetail(shiftId);
-        }
+        // Ei confirm-dialogia: poisto on peruttavissa Kumoa-napilla (6 s)
+        const removed = structuredClone(existing);
+        deleteCall(shiftId, existing.id);
+        closeModal();
+        renderShiftDetail(shiftId);
+        toast("Keikka poistettu", {
+          label: "Kumoa",
+          ms: 6000,
+          action: () => { addCall(shiftId, removed); renderShiftDetail(shiftId); },
+        });
       },
     } : null,
   });
@@ -1331,6 +1355,11 @@ function renderStats() {
 
     ${goalsSectionHtml(s)}
 
+    ${achievementsHtml(s)}
+
+    <h2 class="block-h">🗓️ Aktiivisuuskartta <span class="block-sub">viimeiset 15 viikkoa</span></h2>
+    <div class="card">${heatmapHtml(s)}</div>
+
     <h2 class="block-h">📈 Aktiivisuus ajan myötä</h2>
     <div class="seg toggle-seg" id="act-toggle">
       <button type="button" data-m="day" class="${statsActivityMode === "day" ? "on" : ""}">Päivittäin</button>
@@ -1402,6 +1431,88 @@ function renderStats() {
   if (toggle) toggle.querySelectorAll("button").forEach((b) => {
     b.onclick = () => { statsActivityMode = b.dataset.m; renderStats(); };
   });
+}
+
+// ---------- Saavutukset (motivoiva edistyminen, lasketaan suoraan datasta) ----------
+function computeAchievements(s) {
+  const calls = getAllCalls();
+  const shifts = getShifts();
+  const deck = getEkgDeck();
+  const ekg = ekgMastered(deck);
+  const reflections = calls.filter((c) => (c.reflection || "").trim()).length;
+  const itseCount = calls.filter((c) => c.role === "Suoritin itse").length;
+  const hasNight = shifts.some((x) => x.type === "night");
+  const hasA = calls.some((c) => c.urgency === "A");
+  const allUrg = ["A", "B", "C", "D"].every((u) => calls.some((c) => c.urgency === u));
+  const hasX = calls.some((c) => (c.disposition || "").startsWith("X-"));
+  const hasTimeline = calls.some((c) => (c.timeline || []).length);
+  const prog = (v, t) => ({ done: v >= t, value: Math.min(v, t), target: t });
+  return [
+    { icon: "🚑", title: "Ensimmäinen vuoro", desc: "Kirjaa ensimmäinen työvuoro", ...prog(s.shiftCount, 1) },
+    { icon: "📟", title: "Ensimmäinen keikka", desc: "Kirjaa ensimmäinen tehtävä", ...prog(s.callCount, 1) },
+    { icon: "🔟", title: "10 keikkaa", desc: "Kymmenen tehtävää kirjattu", ...prog(s.callCount, 10) },
+    { icon: "💪", title: "50 keikkaa", desc: "Viisikymmentä tehtävää kirjattu", ...prog(s.callCount, 50) },
+    { icon: "🏆", title: "100 keikkaa", desc: "Sata tehtävää kirjattu", ...prog(s.callCount, 100) },
+    { icon: "⏱️", title: "100 tuntia", desc: "Sata tuntia kentällä", ...prog(Math.floor(s.hoursLogged), 100) },
+    { icon: "🌙", title: "Yökyöpeli", desc: "Ensimmäinen yövuoro", ...prog(hasNight ? 1 : 0, 1) },
+    { icon: "🚨", title: "Ensimmäinen A", desc: "Korkeimman kiireellisyyden tehtävä", ...prog(hasA ? 1 : 0, 1) },
+    { icon: "🎯", title: "Koko kirjo", desc: "Kaikki hälytysasteet A–D kirjattu", ...prog(allUrg ? 4 : ["A", "B", "C", "D"].filter((u) => calls.some((c) => c.urgency === u)).length, 4) },
+    { icon: "🏥", title: "Ensimmäinen kuljetus", desc: "Potilas kuljetettu jatkohoitoon", ...prog(s.transported ? 1 : 0, 1) },
+    { icon: "📋", title: "10 eri koodia", desc: "Kymmenen eri tehtäväkoodia", ...prog(s.distinctCodes, 10) },
+    { icon: "📚", title: "25 eri koodia", desc: "Laaja kokemus tehtävätyypeistä", ...prog(s.distinctCodes, 25) },
+    { icon: "↩️", title: "X-tehtävä", desc: "Ensimmäinen ei-kuljetus (X-koodi)", ...prog(hasX ? 1 : 0, 1) },
+    { icon: "✍️", title: "Reflektoija", desc: "10 keikkareflektiota kirjoitettu", ...prog(reflections, 10) },
+    { icon: "🙋", title: "Omin käsin", desc: "10 toimenpidettä itse suorittaen", ...prog(itseCount, 10) },
+    { icon: "⏲️", title: "Tapahtumaloki", desc: "Aikaleimat kirjattu keikalle", ...prog(hasTimeline ? 1 : 0, 1) },
+    { icon: "📈", title: "Rytmit haltuun", desc: "5 EKG-rytmiä hallussa", ...prog(ekg, 5) },
+    { icon: "🫀", title: "EKG-mestari", desc: `Kaikki ${deck.length} rytmiä hallussa`, ...prog(ekg, deck.length) },
+  ];
+}
+function achievementsHtml(s) {
+  const list = computeAchievements(s);
+  const done = list.filter((a) => a.done).length;
+  return `
+    <h2 class="block-h">🏅 Saavutukset <span class="block-sub">${done}/${list.length}</span></h2>
+    <div class="ach-grid">
+      ${list.map((a) => `
+        <div class="ach ${a.done ? "done" : ""}" title="${esc(a.desc)}">
+          <span class="ach-ic">${a.icon}</span>
+          <span class="ach-t">${esc(a.title)}</span>
+          ${a.done ? `<span class="ach-check">✓</span>` : `<span class="ach-prog">${a.value}/${a.target}</span>`}
+        </div>`).join("")}
+    </div>`;
+}
+
+// ---------- Aktiivisuus-heatmap (viimeiset 15 viikkoa) ----------
+function heatmapHtml(s) {
+  const byDate = {};
+  for (const d of s.dailySeries) byDate[d.date] = d.count;
+  const now = new Date();
+  // Aloita 14 viikkoa sitten maanantaista
+  const start = new Date(now);
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7) - 14 * 7);
+  const weeks = [];
+  const cursor = new Date(start);
+  const todayIso = localISO(now);
+  let maxN = 1;
+  for (let w = 0; w < 15; w++) {
+    const days = [];
+    for (let d = 0; d < 7; d++) {
+      const iso = localISO(cursor);
+      const n = byDate[iso] || 0;
+      if (n > maxN) maxN = n;
+      days.push({ iso, n, future: iso > todayIso });
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    weeks.push(days);
+  }
+  const level = (n) => (n === 0 ? 0 : Math.min(4, Math.ceil((n / maxN) * 4)));
+  return `
+    <div class="heatmap">
+      ${weeks.map((days) => `<div class="hm-col">${days.map((d) =>
+        `<span class="hm-cell l${d.future ? 0 : level(d.n)}${d.iso === todayIso ? " today" : ""}" title="${formatDate(d.iso)}: ${d.n} keikkaa"></span>`).join("")}</div>`).join("")}
+    </div>
+    <div class="hm-legend"><span>Vähemmän</span>${[0, 1, 2, 3, 4].map((l) => `<span class="hm-cell l${l}"></span>`).join("")}<span>Enemmän</span></div>`;
 }
 
 // Harjoittelujakson edistyminen
@@ -2591,7 +2702,10 @@ function renderSettings() {
     applyAccent();
     toast("Asetukset tallennettu");
   };
-  document.getElementById("expJson").onclick = () => shareOrDownload(backupFilename(), exportJSON(), "application/json");
+  document.getElementById("expJson").onclick = () => {
+    updateSettings({ lastBackup: today() });
+    shareOrDownload(backupFilename(), exportJSON(), "application/json");
+  };
   document.getElementById("impBtn").onclick = () => document.getElementById("impFile").click();
   document.getElementById("impFile").onchange = (e) => {
     const file = e.target.files[0];
@@ -2737,13 +2851,24 @@ async function shareOrDownload(name, content, type) {
   }
   download(name, content, type);
 }
-function toast(msg) {
+function toast(msg, opts = {}) {
   const t = document.createElement("div");
   t.className = "toast";
-  t.textContent = msg;
+  if (opts.label && opts.action) {
+    const span = document.createElement("span");
+    span.textContent = msg;
+    const b = document.createElement("button");
+    b.className = "toast-act";
+    b.textContent = opts.label;
+    b.onclick = () => { t.remove(); opts.action(); };
+    t.append(span, b);
+  } else {
+    t.textContent = msg;
+  }
   document.body.appendChild(t);
   setTimeout(() => t.classList.add("show"), 10);
-  setTimeout(() => { t.classList.remove("show"); setTimeout(() => t.remove(), 300); }, 2000);
+  const ms = opts.ms || 2000;
+  setTimeout(() => { t.classList.remove("show"); setTimeout(() => t.remove(), 300); }, ms);
 }
 
 // ---------- Asemateema ----------
@@ -2781,8 +2906,38 @@ applyAccent();
 window.addEventListener("hashchange", route);
 route();
 
+// Service worker + päivitysbanneri: uusi versio ei enää vaadi hard-refreshiä,
+// vaan sovellus tarjoaa "Päivitä"-napin kun uusi versio on ladattu taustalla.
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  window.addEventListener("load", async () => {
+    try {
+      const reg = await navigator.serviceWorker.register("./sw.js");
+      const offerUpdate = (worker) => {
+        showUpdateBanner(() => worker.postMessage("SKIP_WAITING"));
+      };
+      if (reg.waiting && navigator.serviceWorker.controller) offerUpdate(reg.waiting);
+      reg.addEventListener("updatefound", () => {
+        const w = reg.installing;
+        if (!w) return;
+        w.addEventListener("statechange", () => {
+          if (w.state === "installed" && navigator.serviceWorker.controller) offerUpdate(w);
+        });
+      });
+      let reloading = false;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (reloading) return;
+        reloading = true;
+        location.reload();
+      });
+    } catch { /* offline tai estetty – sovellus toimii silti */ }
   });
+}
+function showUpdateBanner(onUpdate) {
+  if (document.querySelector(".update-banner")) return;
+  const b = document.createElement("div");
+  b.className = "update-banner";
+  b.innerHTML = `<span>Uusi versio saatavilla</span><button class="btn-sm" id="ub-go">Päivitä</button><button class="ub-x" aria-label="Sulje">×</button>`;
+  document.body.appendChild(b);
+  b.querySelector("#ub-go").onclick = () => { b.querySelector("#ub-go").textContent = "Päivitetään…"; onUpdate(); };
+  b.querySelector(".ub-x").onclick = () => b.remove();
 }

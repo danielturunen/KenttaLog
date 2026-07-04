@@ -38,6 +38,8 @@ const DEFAULT_DATA = {
     // EKG-korttien edistyminen (Leitner-laatikot) ja käyttäjän omat kortit
     ekgProgress: {},
     ekgCards: [],
+    // Viimeisimmän varmuuskopion päivä (muistutusta varten)
+    lastBackup: "",
     // Käyttäjän omat muistiinpanot per tehtäväkoodi: { "704": "omin sanoin..." }
     codeNotes: {},
   },

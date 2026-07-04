@@ -9,6 +9,12 @@
   "background_color": "#0d1117",
   "theme_color": "#0d1117",
   "lang": "fi",
+  "shortcuts": [
+    { "name": "Vuorot", "url": "./#/", "description": "Vuorolista ja uusi vuoro" },
+    { "name": "Kaikki keikat", "url": "./#calls", "description": "Selaa ja hae keikkoja" },
+    { "name": "Tilastot", "url": "./#stats", "description": "Tilastot ja saavutukset" },
+    { "name": "Työkalut", "url": "./#tools", "description": "Laskurit, kenttäopas ja EKG-kortit" }
+  ],
   "icons": [
     {
       "src": "./icons/icon.svg",
