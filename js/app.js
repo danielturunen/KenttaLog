@@ -265,6 +265,7 @@ function renderHome() {
       </div>
       <button class="btn primary" id="newShift">+ Vuoro</button>
     </header>
+    ${todayCardHtml(shifts)}
     <div class="seg view-seg">
       <button type="button" data-v="list" class="${homeView === "list" ? "on" : ""}">Lista</button>
       <button type="button" data-v="calendar" class="${homeView === "calendar" ? "on" : ""}">Kalenteri</button>
@@ -275,6 +276,13 @@ function renderHome() {
     <div id="home-body"></div>
   `;
   document.getElementById("newShift").onclick = () => openShiftForm();
+  const curShift = shifts.find((x) => shiftCategory(x) === 0);
+  if (curShift) {
+    const tcOpen = document.getElementById("tc-open");
+    const tcCall = document.getElementById("tc-call");
+    if (tcOpen) tcOpen.onclick = () => { location.hash = `#shift/${curShift.id}`; };
+    if (tcCall) tcCall.onclick = () => openCallForm(curShift.id);
+  }
   const goInc = document.getElementById("goIncomplete");
   if (goInc) goInc.onclick = () => { callFilter = { ...callFilter, incomplete: true }; location.hash = "#calls"; };
   document.querySelectorAll(".view-seg button").forEach((b) => {
@@ -338,6 +346,47 @@ function calendarHtml(shifts) {
       <span><i class="lg night"></i> Yö 21–9</span>
       <span><i class="lg custom"></i> Muu</span>
       <span class="muted">Numero = keikat</span>
+    </div>`;
+}
+
+// Tämän päivän / käynnissä oleva vuoro nostetaan etusivun kärkeen omana
+// korttinaan, josta keikan kirjaus onnistuu yhdellä napautuksella.
+function todayCardHtml(shifts) {
+  const cur = shifts.find((s) => shiftCategory(s) === 0);
+  if (!cur) return "";
+  const calls = cur.calls || [];
+  const now = new Date();
+  const startMin = shiftStartMin(cur);
+  const endRaw = cur.endTime || (cur.type === "night" ? "09:00" : "21:00");
+  const [eh, em] = endRaw.split(":").map(Number);
+  let endMin = eh * 60 + em;
+  let nowMin = now.getHours() * 60 + now.getMinutes();
+  let total = endMin - startMin;
+  if (total <= 0) total += 24 * 60; // yli keskiyön
+  // Yövuorolla aamupuolella kello on "seuraavan päivän" puolella
+  if (cur.date !== today()) nowMin += 24 * 60;
+  const elapsed = nowMin - startMin;
+  const running = elapsed >= 0 && elapsed <= total;
+  const pct = running ? Math.round((elapsed / total) * 100) : 0;
+  const left = running ? total - elapsed : 0;
+  const leftTxt = running ? `${Math.floor(left / 60)} h ${String(left % 60).padStart(2, "0")} min jäljellä` : (elapsed < 0 ? "Alkaa myöhemmin tänään" : "Päättynyt");
+  const sub = [cur.unit, cur.station].filter(Boolean).map(esc).join(" · ");
+  const head = cur.type === "day" ? "Päivävuoro 9–21" : cur.type === "night" ? "Yövuoro 21–9" : `Vuoro ${esc(cur.startTime || "")}–${esc(cur.endTime || "")}`;
+  return `
+    <div class="today-card" style="--sc:${stationColor(cur.station) || "var(--primary)"}">
+      <div class="tc-top">
+        <span class="tc-live">${running ? "● Vuoro käynnissä" : "Tämän päivän vuoro"}</span>
+        <span class="tc-type">${head}</span>
+      </div>
+      ${sub ? `<div class="tc-sub">${sub}</div>` : ""}
+      ${running ? `<div class="bartrack tc-bar"><div class="barfill" style="width:${pct}%"></div></div>` : ""}
+      <div class="tc-bottom">
+        <span class="tc-info">${calls.length} keikkaa · ${leftTxt}</span>
+        <span class="tc-actions">
+          <button class="btn ghost" id="tc-open">Avaa</button>
+          <button class="btn tc-newcall" id="tc-call">＋ Keikka</button>
+        </span>
+      </div>
     </div>`;
 }
 
@@ -861,7 +910,9 @@ function openCallForm(shiftId, existing) {
       if (existing) updateCall(shiftId, existing.id, patch);
       else addCall(shiftId, patch);
       closeModal();
-      renderShiftDetail(shiftId);
+      // Etusivun Tänään-kortista tultaessa hash on vielä "#/" → siirry vuoroon
+      if (location.hash.startsWith("#shift/")) renderShiftDetail(shiftId);
+      else location.hash = `#shift/${shiftId}`;
     },
     extra: existing ? {
       label: "Poista keikka",
@@ -1097,50 +1148,49 @@ function renderNoteMarkdown(md) {
   return out.join("");
 }
 
-// ---- Ohjerungot per tehtäväkoodi ----
-// HUOM: Itse laadittuja, yleisiä kliinisiä muistirunkoja (ei Ensihoito-oppaan
-// tekstiä, ei lääkeannoksia). Erottavat kiireellisen (A/B) ja vakaan (C/D)
-// tehtävän painopisteet. Käyttäjä täydentää omalla materiaalillaan.
+// ---- Kiireellisyyspainotukset per tehtäväkoodi ----
+// Työnjako sisällössä (ei toistoa):
+//   ab/cd (tässä)        = 1–2 riviä: mikä juuri tällä kiireellisyydellä painottuu
+//   codeinfo.js actions  = koodikohtaiset hoidon linjat
+//   codeinfo.js assess   = mitä arvioidaan/mitataan
+//   codeinfo.js red      = hälytysmerkit
+// acute: true = tehtävä hoidetaan aina kiireellisenä hälytysasteesta riippumatta.
 const GUIDE_BASE_AB = [
-  "Varmista oma ja työparin turvallisuus; hälytä lisäapu ajoissa",
-  "cABCDE: tunnista ja hoida henkeä uhkaavat löydökset heti",
-  "Jatkuva monitorointi ja ABCDE:n toistaminen",
+  "Tunnista ja hoida henkeä uhkaavat löydökset heti (cABCDE)",
   "Ennakkoilmoitus ja kuljetus oikeaan hoitopaikkaan viiveettä",
 ];
 const GUIDE_BASE_CD = [
-  "Systemaattinen tutkiminen ja peruselintoimintojen arvio",
-  "Esitiedot (SAMPLE) ja oireanalyysi (OPQRST)",
-  "Arvioi kuljetustarve ja oikea hoitolinja",
-  "Jos ei kuljeteta: selkeät jatko-ohjeet ja turvaverkko (milloin soitettava uudelleen)",
+  "Systemaattinen tutkiminen, esitiedot (SAMPLE) ja oireanalyysi",
+  "Jos ei kuljeteta: selkeät jatko-ohjeet ja turvaverkko",
 ];
 const GUIDE_CODE = {
-  "700": { focus: "Eloton", primary: "ab", ab: ["Aloita laadukas paineluelvytys mahdollisimman keskeytyksittä", "Defibrilloi iskettävä rytmi varhain", "Turvaa ilmatie ja hapetus, ventiloi", "Mieti ja hoida palautuvat syyt", "Kirjaa tapahtuma-ajat tapahtumalokiin"], cd: ["Tämä tehtävä on lähtökohtaisesti kiireellinen – toimi A/B-rungolla", "Elottomuuden toteaminen / elvytyksestä pidättäytyminen pysyväisohjeen mukaan"] },
-  "701": { focus: "Elvytys", primary: "ab", ab: ["Laadukas painelu–puhallus, minimoi tauot", "Defibrillaatio iskettävälle rytmille", "Ilmatien hallinta ja hapetus", "Hoida palautuvat syyt; harkitse syyn mukaista hoitoa", "Kirjaa ajat tapahtumalokiin (rytmintarkistus, defib, lääke, ROSC)"], cd: ["Lähtökohtaisesti kiireellinen – käytä A/B-runkoa"] },
-  "702": { focus: "Tajuttomuus", primary: "ab", ab: ["Turvaa ilmatie (asento ja apuvälineet)", "Hapetus ja ventilaation tuki tarvittaessa", "Mittaa verensokeri", "Arvioi GCS, pupillat ja puolierot", "Etsi syytä (mm. happivaje, matala sokeri, myrkytys, AVH)"], cd: ["Seuraa tajunnan tasoa toistuvasti", ...GUIDE_BASE_CD] },
-  "703": { focus: "Hengitysvaikeus", primary: "ab", ab: ["Tue happeutumista tavoitesaturaatioon", "Arvioi hengitystyö, -taajuus ja hengitysäänet", "Asentohoito (puoli-istuva)", "Harkitse CPAP / ventilaation tuki pysyväisohjeen mukaan"], cd: ["Selvitä taustasairaus ja lääkitys", ...GUIDE_BASE_CD] },
-  "704": { focus: "Rintakipu", primary: "ab", ab: ["Ota 12-kanavainen EKG varhain ja toista tarvittaessa", "Jatkuva rytmiseuranta, defibrillaatiovalmius", "Hoida pysyväisohjeen mukaan", "Ennakkoilmoitus tarvittaessa (PCI-valmius)"], cd: ["Kivun luonne (OPQRST) ja riskitekijät", "12-EKG myös vakaalla", ...GUIDE_BASE_CD] },
-  "705": { focus: "Rytmihäiriö", primary: "ab", ab: ["12-kanavainen EKG ja jatkuva monitorointi", "Arvioi vakaus vs. epävakaus", "Kardioversio- / tahdistusvalmius epävakaalla", "Hoito pysyväisohjeen tai konsultaation mukaan"], cd: ["Dokumentoi rytmi ja oireet (EKG)", ...GUIDE_BASE_CD] },
-  "706": { focus: "Aivoverenkiertohäiriö", primary: "ab", ab: ["Tunnista oireet (esim. FAST) ja oireiden tarkka alkamisaika", "Mittaa verensokeri", "Pre-alert ja kuljetus AVH-yksikköön viiveettä", "Vältä turhia viiveitä kohteessa"], cd: ["Kirjaa oireiden alku ja kulku tarkasti", ...GUIDE_BASE_CD] },
-  "711": { focus: "Ilmatie-este", primary: "ab", ab: ["Avaa ja turvaa ilmatie", "Poista este hallitusti, hapetus", "Varaudu ventilaatioon / kajoavaan ilmatiehen"], cd: GUIDE_BASE_CD },
-  "713": { focus: "Hirttäytyminen / kuristuminen", primary: "ab", ab: ["Turvaa ilmatie ja hapetus", "Huomioi kaularangan mahdollinen vamma", "Seuraa tajuntaa ja hengitystä"], cd: GUIDE_BASE_CD },
-  "714": { focus: "Hukkuminen", primary: "ab", ab: ["Turvaa ilmatie ja hapetus, varaudu elvytykseen", "Estä jäähtyminen, mittaa lämpö", "Seuraa hengitystä ja tajuntaa"], cd: GUIDE_BASE_CD },
-  "771": { focus: "Sokeritasapainon häiriö", primary: "ab", ab: ["Mittaa verensokeri", "Hoida pysyväisohjeen mukaan", "Arvioi tajunta ja nielemiskyky ennen suun kautta annettavaa"], cd: ["Selvitä syy (lääkitys, ruokailu, sairaus)", ...GUIDE_BASE_CD] },
-  "772": { focus: "Kouristelu", primary: "ab", ab: ["Turvaa ilmatie ja estä lisävammat", "Mittaa verensokeri", "Kirjaa kesto ja toistuvuus; hoito pysyväisohjeen mukaan"], cd: ["Toipumisen seuranta, syiden kartoitus", ...GUIDE_BASE_CD] },
-  "773": { focus: "Yliherkkyysreaktio", primary: "ab", ab: ["Tunnista anafylaksia (hengitys ja verenkierto)", "Poista altiste", "Hoida pysyväisohjeen mukaan viiveettä"], cd: ["Lievässä reaktiossa seuranta ja jatko-ohjeet", ...GUIDE_BASE_CD] },
-  "791": { focus: "Synnytys", primary: "ab", ab: ["Arvioi synnytyksen vaihe ja ehtiikö sairaalaan", "Valmistaudu äidin ja vauvan hoitoon", "Vastasyntyneen lämpötalous, hengitys ja virkeys"], cd: ["Säännölliset supistukset: arvioi kuljetus ajoissa", ...GUIDE_BASE_CD] },
-  "796": { focus: "Monipotilastilanne", primary: "ab", ab: ["Tee tilannearvio ja triage", "Johtaminen, työnjako ja lisäresurssit", "Raportointi ja potilaiden priorisointi"], cd: ["Pienemmässä tilanteessa systemaattinen priorisointi", ...GUIDE_BASE_CD] },
-  "785": { focus: "Mielenterveysongelma", primary: "cd", ab: ["Jos peruselintoiminnot uhattuna tai välitön vaara, siirry A/B-runkoon", "Oma turvallisuus; yhteistyö poliisin kanssa tarvittaessa"], cd: ["Arvioi itsetuhoisuus ja väkivaltariski", "Sulje pois somaattiset syyt", "Rauhallinen kohtaaminen, hoitopaikan ja -linjan valinta"] },
+  "700": { primary: "ab", acute: true, ab: ["Kirjaa tapahtuma-ajat tapahtumalokiin (painelun alku, defibrillaatiot, ROSC)"], cd: [] },
+  "701": { primary: "ab", acute: true, ab: ["Työnjako heti selväksi: painelija, ilmatie, defibrillaattori, kirjaaja"], cd: [] },
+  "702": { primary: "ab", ab: ["Matala GCS: ilmatie ja hengitys etusijalla, älä viivytä kuljetusta syyn etsinnällä"], cd: ["Seuraa tajuntaa toistuvasti – vakaakin tajunnanhäiriö voi syventyä matkalla"] },
+  "703": { primary: "ab", ab: ["Uupumisen merkit ratkaisevat: tuki heti, älä jää odottamaan vastetta kohteeseen"], cd: ["Vertaa potilaan omaan normaalitilaan (esim. COPD) – kysy mikä on muuttunut"] },
+  "704": { primary: "ab", ab: ["Suuren riskin rintakipu: minimoi viiveet, PCI-ennakkoilmoitus matalalla kynnyksellä"], cd: ["Kiireetönkin rintakipu voi olla ACS – epätyypilliset oireet yleisiä iäkkäillä ja diabeetikoilla"] },
+  "705": { primary: "ab", ab: ["Epävakauden merkit (matala paine, tajunnan häiriö, rintakipu) → hoito ei odota"], cd: ["Tallenna rytmi EKG:lle oireen aikana – se on arvokkain yksittäinen löydös"] },
+  "706": { primary: "ab", ab: ["Aika on aivoja: minimoi kohdeaika, suoraan AVH-yksikköön"], cd: ["Myös ohimenneet oireet (TIA) vaativat kiireellisen arvion – kirjaa alkuaika tarkasti"] },
+  "711": { primary: "ab", ab: ["Täydellinen este ei odota: poista este ja varaudu elvytykseen"], cd: ["Osittainen este voi täydentyä äkisti – seuraa ja varaudu koko ajan"] },
+  "713": { primary: "ab", ab: ["Turvaa ilmatie varhain – turvotus voi pahentua nopeasti"], cd: ["Oireettomankin kuristumisen jälkeen seuranta: ilmatieongelma voi kehittyä viiveellä"] },
+  "714": { primary: "ab", ab: ["Hapetus ja ventilaatio ohittavat kaiken muun"], cd: ["Keuhko-oireet voivat ilmaantua tuntien viiveellä – matala kynnys kuljetukselle"] },
+  "771": { primary: "ab", ab: ["Tajunnanhäiriöiselle ei mitään suun kautta"], cd: ["Korjauksen jälkeen selvitä syy: miksi sokeri laski, toistuuko ilman muutoksia?"] },
+  "772": { primary: "ab", ab: ["Pitkittynyt kohtaus (yli 5 min) on hätätilanne – lääkitys viiveettä"], cd: ["Ensimmäinen kohtaus vaatii aina jatkoselvittelyn – kirjaa kulku silminnäkijöiltä"] },
+  "773": { primary: "ab", ab: ["Anafylaksiassa adrenaliini ei odota – anna heti hoito-ohjeen mukaan"], cd: ["Seuraa riittävän pitkään myös lievässä reaktiossa – kaksivaiheinen reaktio mahdollinen"] },
+  "785": { primary: "cd", ab: ["Välitön vaara tai peruselintoimintojen häiriö edellä – muu odottaa"], cd: ["Sulje somaattinen syy pois (sokeri, happi, myrkytys) ennen psykiatrista tulkintaa"] },
+  "791": { primary: "ab", ab: ["Ponnistusvaihe käynnissä: valmistaudu synnytykseen kohteessa, älä lähde ajamaan"], cd: ["Ehtiikö sairaalaan? Supistusten tiheys ja kesto, aiemmat synnytykset, matka"] },
+  "796": { primary: "ab", ab: ["Ensimmäinen yksikkö johtaa ja tekee triagen – älä sitoudu yhteen potilaaseen"], cd: ["Pienessäkin monipotilastilanteessa: priorisointi ja selkeä työnjako ensin"] },
 };
 const GUIDE_PREFIX = {
-  trauma: { focus: "Vamma", primary: "ab", ab: ["Hallitse henkeä uhkaava ulkoinen verenvuoto (paine- / kiristysside)", "cABCDE ja vammojen kartoitus", "Tue ranka ja immobilisoi tarvittaessa", "Estä jäähtyminen; kuljetus oikeaan traumayksikköön"], cd: ["Paikallinen vamma: tutki, tue ja arvioi toimintakyky", ...GUIDE_BASE_CD] },
-  expo: { focus: "Onnettomuus / altistuminen", primary: "ab", ab: ["Oma turvallisuus ja altisteen tunnistus ensin", "Lopeta altistuminen turvallisesti", "ABCDE; palovammassa jäähdytä ja suojaa, estä jäähtyminen", "Myrkytyksessä selvitä aine, määrä ja altistusaika"], cd: ["Lievä altistus: seuranta ja jatko-ohjeet", ...GUIDE_BASE_CD] },
-  bleed: { focus: "Verenvuoto", primary: "ab", ab: ["Arvioi vuodon määrä ja hemodynamiikka", "Tyrehdytä ulkoinen vuoto", "Varaudu sokin tunnistukseen ja hoitoon"], cd: ["Vähäinen vuoto: paikallishoito ja seuranta", ...GUIDE_BASE_CD] },
-  symptom: { focus: "Kipuoire", primary: "cd", ab: ["Jos peruselintoiminnot uhattuna, siirry A/B-runkoon"], cd: ["Oireanalyysi (OPQRST) ja systemaattinen tutkiminen", "Tunnista hälyttävät löydökset (punaiset liput)", "Kivunhoito pysyväisohjeen mukaan", "Kuljetustarve ja oikea hoitopaikka"] },
+  trauma: { primary: "ab", ab: ["Suuri energia: kokonaisarvio ja nopea kuljetus menevät yksityiskohtien edelle"], cd: ["Paikallinen vamma: tutki huolella, arvioi toimintakyky ja kotona pärjääminen"] },
+  expo: { primary: "ab", ab: ["Oma turvallisuus ja altistuksen katkaisu aina ensin"], cd: ["Kirjaa aine, määrä ja altistusaika tarkasti myös lievässä altistuksessa"] },
+  bleed: { primary: "ab", ab: ["Arvioi hukattu määrä ja sokin merkit – nuori kompensoi pitkään"], cd: ["Toistuva vähäinenkin vuoto voi kertoa vakavasta syystä – matala konsultaatiokynnys"] },
+  symptom: { primary: "cd", ab: ["Peruselintoimintojen häiriö kivun taustalla → hoida löydös, älä vain oiretta"], cd: ["Punaisten lippujen poissulku on kiireettömän kipukeikan tärkein tehtävä"] },
 };
 const GUIDE_GROUP = {
-  x: { focus: "Ei kuljetusta", primary: "cd", ab: ["Varmista, ettei jää henkeä uhkaavaa tilaa", "Konsultoi / pyydä hoito-ohje tarvittaessa"], cd: ["Dokumentoi tutkiminen ja päätöksen perustelu", "Anna selkeät jatko-ohjeet ja turvaverkko", "Varmista potilaan suostumus ja ymmärrys", "Kirjaa konsultaatio ja hoito-ohje"] },
-  pel: { focus: "Pelastusjohtoinen", primary: "ab", ab: ["Oma turvallisuus ja työnjako viranomaisten kesken", "Potilaiden triage ja ensihoidon priorisointi", "Tilannekuva ja raportointi johdolle"], cd: ["Pienemmässä tilanteessa systemaattinen arvio", ...GUIDE_BASE_CD] },
-  pol: { focus: "Poliisijohtoinen", primary: "ab", ab: ["Oma turvallisuus ensin; toimi vasta kun kohde on poliisin turvaama", "cABCDE ja ulkoisen vuodon hallinta", "Dokumentoi löydökset huolellisesti"], cd: ["Vakaa potilas: systemaattinen arvio ja jatko", ...GUIDE_BASE_CD] },
+  x: { primary: "cd", ab: ["Jos löydökset eivät tue X-koodia, hälytysaste ja kuljetuspäätös uusiksi"], cd: ["X-päätös on hoitopäätös: perustelu, suostumus ja turvaverkko kirjataan aina"] },
+  pel: { primary: "ab", ab: ["Oma turvallisuus ja työnjako viranomaisten kesken", "Potilaiden triage ja ensihoidon priorisointi", "Tilannekuva ja raportointi johdolle"], cd: ["Pienemmässä tilanteessa systemaattinen arvio", ...GUIDE_BASE_CD] },
+  pol: { primary: "ab", ab: ["Oma turvallisuus ensin; toimi vasta kun kohde on poliisin turvaama", "cABCDE ja ulkoisen vuodon hallinta", "Dokumentoi löydökset huolellisesti"], cd: ["Vakaa potilas: systemaattinen arvio ja jatko", ...GUIDE_BASE_CD] },
 };
 // Kenttäoppaan kuvakortit per tehtäväkoodi (näkyvät keikkalomakkeen ohjeessa).
 const HUD_BASE = "./img/hud/";
@@ -1175,9 +1225,12 @@ function codeGuidance(code) {
     else if (/^78/.test(code)) spec = GUIDE_PREFIX.symptom;
   }
   if (!spec) spec = GUIDE_GROUP[info.groupId];
-  const ab = (spec?.ab?.length ? spec.ab : GUIDE_BASE_AB).slice(0, 6);
-  const cd = (spec?.cd?.length ? spec.cd : GUIDE_BASE_CD).slice(0, 6);
-  return { ab, cd, focus: spec?.focus || info.name, primary: spec?.primary || "ab" };
+  // generic = ei koodikohtaista painotusta → tier-listaa ei näytetä, jos
+  // codeinfo (hoidon linjat + arvio) kattaa sisällön muutenkin.
+  const generic = !spec;
+  const ab = (spec?.ab || GUIDE_BASE_AB).slice(0, 6);
+  const cd = (spec?.cd || GUIDE_BASE_CD).slice(0, 6);
+  return { ab, cd, primary: spec?.primary || "ab", acute: !!spec?.acute, generic };
 }
 function guidanceHtml(code, urgency) {
   code = (code || "").toUpperCase();
@@ -1188,17 +1241,39 @@ function guidanceHtml(code, urgency) {
   const tier = (u === "A" || u === "B") ? "ab" : (u === "C" || u === "D") ? "cd" : null;
   const list = (arr) => `<ul class="g-list">${arr.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`;
   const what = info?.what ? `<p class="g-what">${esc(info.what)}</p>` : "";
+  const actions = info?.actions?.length ? `<div class="g-sec"><h4>Hoidon linjat</h4>${list(info.actions)}</div>` : "";
   const assess = info?.assess?.length ? `<div class="g-sec"><h4>Keskeinen arvio</h4>${list(info.assess)}</div>` : "";
   const note = `<p class="g-note">Yleistä, itse koostettua ensihoidon tietoa (lähteinä mm. StatPearls, ERC, AHA/ASA, WHO). Noudata alueellista hoito-ohjetta – ei lääkeannoksia, ei korvaa virallista ohjetta.</p>`;
   const hud = hudCardsHtml(code);
+  // Painotuslista näytetään vain, jos se tuo koodikohtaista lisäarvoa
+  // (geneeriset perusrungot jätetään pois kun hoidon linjat + arvio kattavat sisällön).
+  const tierList = (arr, cls, title) =>
+    (arr.length && !(g.generic && info)) ? `<div class="g-tier ${cls}"><h4>${title}</h4>${list(arr)}</div>` : "";
 
+  // Aina kiireellinen tehtävä (esim. eloton/elvytys): C/D-valinta ei muuta lähestymistä
+  if (g.acute && tier) {
+    return `<details class="guidance g-acute" open>
+      <summary>🚨 ${esc(u)}-${esc(code)} · aina kiireellinen tehtävä</summary>
+      <div class="g-body">
+        ${what}
+        ${tier === "cd" ? `<p class="g-hint">Hälytysasteesta riippumatta tämä tehtävä hoidetaan kiireellisen mallin mukaan.</p>` : ""}
+        ${tierList(g.ab, "g-ab", "Painopisteet")}
+        ${info?.red?.length ? `<div class="g-sec g-redflags"><h4>⚠️ Tunnista heti</h4>${list(info.red)}</div>` : ""}
+        ${actions}
+        ${assess}
+        ${hud}
+        ${note}
+      </div>
+    </details>`;
+  }
   if (tier === "ab") {
     return `<details class="guidance g-acute" open>
       <summary>🚨 ${esc(u)}-${esc(code)} · kiireellinen lähestyminen</summary>
       <div class="g-body">
         ${what}
-        <div class="g-tier g-ab"><h4>Toimi heti – painopisteet</h4>${list(g.ab)}</div>
+        ${tierList(g.ab, "g-ab", "Painopisteet tällä keikalla")}
         ${info?.red?.length ? `<div class="g-sec g-redflags"><h4>⚠️ Tunnista / sulje pois heti</h4>${list(info.red)}</div>` : ""}
+        ${actions}
         ${assess}
         ${hud}
         ${note}
@@ -1210,23 +1285,25 @@ function guidanceHtml(code, urgency) {
       <summary>🩺 ${esc(u)}-${esc(code)} · vakaa, kiireetön lähestyminen</summary>
       <div class="g-body">
         ${what}
-        <div class="g-tier g-cd"><h4>Systemaattinen ote</h4>${list(g.cd)}</div>
+        ${tierList(g.cd, "g-cd", "Painopisteet tällä keikalla")}
         ${info?.red?.length ? `<div class="g-sec g-redflags"><h4>⚠️ Sulje pois ennen kuin hoidat kiireettömänä</h4>${list(info.red)}</div>` : ""}
+        ${actions}
         ${assess}
         ${hud}
         ${note}
       </div>
     </details>`;
   }
-  // Ei valittua hälytysastetta → näytä molemmat (esim. koodikirjasto / referenssi)
+  // Ei valittua hälytysastetta → referenssinäkymä (esim. koodikirjasto)
   return `<details class="guidance">
     <summary>🧭 Tietoa tehtävästä & lähestyminen kiireellisyyden mukaan</summary>
     <div class="g-body">
       ${what}
-      <p class="g-hint">Valitse hälytysaste, niin näet juuri sille keikalle painottuvan ohjeen. Yleisesti:</p>
-      <div class="g-tier g-ab"><h4>A / B · kiireellinen – toimi heti</h4>${list(g.ab)}</div>
-      <div class="g-tier g-cd"><h4>C / D · vakaa – systemaattinen ote</h4>${list(g.cd)}</div>
-      ${info?.red?.length ? `<div class="g-sec g-redflags"><h4>⚠️ Hälyttävät löydökset / pois suljettavat</h4>${list(info.red)}</div>` : ""}
+      ${g.acute ? `<p class="g-hint">Aina kiireellinen tehtävä hälytysasteesta riippumatta.</p>` : `<p class="g-hint">Valitse hälytysaste, niin näet juuri sille keikalle painottuvan ohjeen.</p>`}
+      ${!g.acute ? tierList(g.ab, "g-ab", "A / B · kiireellisenä painottuu") : tierList(g.ab, "g-ab", "Painopisteet")}
+      ${!g.acute ? tierList(g.cd, "g-cd", "C / D · vakaana painottuu") : ""}
+      ${info?.red?.length ? `<div class="g-sec g-redflags"><h4>⚠️ Hälyttävät löydökset</h4>${list(info.red)}</div>` : ""}
+      ${actions}
       ${assess}
       ${hud}
       ${note}
@@ -1241,19 +1318,26 @@ function guidanceMarkdown(code, urgency) {
   const u = (urgency || "").toUpperCase();
   const tier = (u === "A" || u === "B") ? "ab" : (u === "C" || u === "D") ? "cd" : null;
   const sec = (title, arr) => arr?.length ? `### ${title}\n${arr.map((x) => `- ${x}`).join("\n")}\n\n` : "";
+  const showTier = (arr) => arr.length && !(g.generic && info);
   let md = "";
   if (info?.what) md += `${info.what}\n\n`;
-  if (info) md += sec("Keskeinen arvio", info.assess);
-  if (tier === "ab") {
-    md += `## Kiireellinen (A/B) – toimi heti\n${g.ab.map((x) => `- ${x}`).join("\n")}\n\n`;
+  if (g.acute) {
+    md += `**Aina kiireellinen tehtävä hälytysasteesta riippumatta.**\n\n`;
+    if (showTier(g.ab)) md += sec("Painopisteet", g.ab);
+    md += sec("Tunnista heti", info?.red);
+  } else if (tier === "ab") {
+    if (showTier(g.ab)) md += sec("Kiireellisenä painottuu", g.ab);
     md += sec("Sulje pois / tunnista heti", info?.red);
   } else if (tier === "cd") {
-    md += `## Vakaa (C/D) – systemaattinen ote\n${g.cd.map((x) => `- ${x}`).join("\n")}\n\n`;
+    if (showTier(g.cd)) md += sec("Vakaana painottuu", g.cd);
     md += sec("Sulje pois ennen kiireetöntä linjaa", info?.red);
   } else {
-    md += `## A/B – kiireellinen\n${g.ab.map((x) => `- ${x}`).join("\n")}\n\n## C/D – vakaa\n${g.cd.map((x) => `- ${x}`).join("\n")}\n\n`;
+    if (showTier(g.ab)) md += sec("A/B – kiireellisenä painottuu", g.ab);
+    if (showTier(g.cd)) md += sec("C/D – vakaana painottuu", g.cd);
     md += sec("Hälyttävät löydökset", info?.red);
   }
+  if (info) md += sec("Hoidon linjat", info.actions);
+  if (info) md += sec("Keskeinen arvio", info.assess);
   return md.trimEnd() + "\n";
 }
 
