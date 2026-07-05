@@ -110,26 +110,6 @@ function isTeho(dest) {
   return /teho/i.test(dest || "");
 }
 
-// Tapahtumaloki: yleiset aikaleimattavat tapahtumat (ei oppikirjasisältöä).
-const TIMELINE_EVENTS = [
-  "Potilas tavoitettu",
-  "Hoito aloitettu",
-  "Painelu alkoi",
-  "Rytmintarkistus",
-  "Defibrillointi",
-  "Adrenaliini",
-  "Lääke annettu",
-  "ROSC",
-  "Kuljetus alkoi",
-  "Luovutus",
-];
-function nowClock() { return new Date().toTimeString().slice(0, 8); }
-function timelineListHtml(items) {
-  if (!items.length) return `<p class="muted small">Ei tapahtumia. Napauta painiketta kirjataksesi aikaleiman juuri nyt.</p>`;
-  return `<div class="tl-rows">${items.map((e, i) =>
-    `<div class="tl-item"><span class="tl-time">${esc(e.t)}</span><span class="tl-label">${esc(e.label)}</span><button type="button" class="tl-del" data-i="${i}" aria-label="Poista">×</button></div>`).join("")}</div>`;
-}
-
 // X-koodin tarkennevalikon optiot (esim. X-4 -> X-41…X-45).
 function xSubOptions(disposition, selected) {
   const base = (disposition || "").split(" ")[0];
@@ -630,7 +610,7 @@ function renderShiftDetail(id) {
       const src = (s.calls || []).find((c) => c.id === b.dataset.dup);
       if (!src) return;
       const { id, ...rest } = src;
-      const dup = { ...rest, time: nowTime(), description: "", reflection: "", timeline: null, photos: null };
+      const dup = { ...rest, time: nowTime(), description: "", reflection: "", photos: null };
       addCall(s.id, dup);
       toast("Keikka kopioitu");
       renderShiftDetail(s.id);
@@ -668,7 +648,6 @@ function callRow(shiftId, c) {
           ${c.disposition === "Kuljetettu" && c.transportCode ? `<span class="meta-pill">Kulj. ${esc(c.transportCode)}${c.transportUrgency ? " " + esc(c.transportUrgency) : ""}</span>` : ""}
           ${(c.tags || []).map((t) => `<span class="meta-pill tag">${esc(t)}</span>`).join("")}
           ${c.role ? `<span class="meta-pill role">${esc(c.role)}</span>` : ""}
-          ${(c.timeline || []).length ? `<span class="meta-pill tl">⏱ ${c.timeline.length} tapahtumaa</span>` : ""}
           ${(c.photos || []).length ? `<span class="meta-pill">📷 ${c.photos.length}</span>` : ""}
         </div>
       </div>
@@ -741,13 +720,12 @@ function renderShiftSummary(id) {
             }
             const tagsLine = (c.tags || []).length ? `<div class="pv-rowtags">${(c.tags || []).map(esc).join(", ")}${c.role ? ` — ${esc(c.role)}` : ""}</div>` : (c.role ? `<div class="pv-rowtags">${esc(c.role)}</div>` : "");
             const refl = c.reflection ? `<div class="pv-rowrefl">💡 ${esc(c.reflection)}</div>` : "";
-            const tl = (c.timeline || []).length ? `<div class="pv-rowtl">⏱ ${c.timeline.map((e) => `${esc(e.t)} ${esc(e.label)}`).join(" · ")}</div>` : "";
             return `<tr>
               <td>${esc(c.time || "")}</td>
               <td>${esc(c.urgency || "")}</td>
               <td>${esc(c.code || "")}</td>
               <td>${esc(c.codeName || "")}</td>
-              <td>${esc(c.description || "")}${tagsLine}${tl}${refl}</td>
+              <td>${esc(c.description || "")}${tagsLine}${refl}</td>
               <td>${esc(vs)}</td>
               <td>${esc(disp)}</td>
             </tr>`;
@@ -767,7 +745,6 @@ function renderShiftSummary(id) {
 function openCallForm(shiftId, existing) {
   const settings = getSettings();
   const c = existing || { time: nowTime(), urgency: "", disposition: "" };
-  let timeline = (c.timeline || []).map((e) => ({ ...e }));
   let photos = (c.photos || []).slice();
   // Sisäänrakennetut toimenpiteet + käyttäjän omat tagit
   const allTags = [...new Set([...PROCEDURES, ...(settings.tags || [])])];
@@ -843,16 +820,6 @@ function openCallForm(shiftId, existing) {
         ${ROLES.map((r) => `<button type="button" data-r="${esc(r)}" class="${(c.role || "") === r ? "on" : ""}">${esc(r || "–")}</button>`).join("")}
       </div>
     </label>
-    <label>Tapahtumaloki – aikaleimat
-      <div class="tl-presets" id="c-tl-presets">
-        ${TIMELINE_EVENTS.map((e) => `<button type="button" class="tl-btn" data-ev="${esc(e)}">+ ${esc(e)}</button>`).join("")}
-      </div>
-      <div class="tl-add">
-        <input type="text" id="c-tl-custom" placeholder="Oma tapahtuma…">
-        <button type="button" class="btn-sm" id="c-tl-addbtn">Lisää nyt</button>
-      </div>
-      <div class="tl-list" id="c-tl-list">${timelineListHtml(timeline)}</div>
-    </label>
     <label>Peruselintoiminnot (vapaaehtoinen)
       <div class="vitals">
         <span><small>RR</small><input type="text" id="v-rr" inputmode="numeric" value="${esc(c.vitals?.rr || "")}" placeholder="120/80"></span>
@@ -901,7 +868,6 @@ function openCallForm(shiftId, existing) {
         role: document.querySelector("#c-role .on")?.dataset.r || "",
         reflection: val("c-reflect"),
         vitals: hasVitals ? vitals : null,
-        timeline: timeline.length ? timeline : null,
         photos: photos.length ? photos : null,
       };
       if (existing) updateCall(shiftId, existing.id, patch);
@@ -991,29 +957,6 @@ function openCallForm(shiftId, existing) {
   document.querySelectorAll("#c-role button").forEach((b) => {
     b.onclick = () => document.querySelectorAll("#c-role button").forEach((x) => x.classList.toggle("on", x === b));
   });
-  // Tapahtumaloki
-  const tlList = document.getElementById("c-tl-list");
-  const renderTl = () => {
-    tlList.innerHTML = timelineListHtml(timeline);
-    tlList.querySelectorAll(".tl-del").forEach((b) => {
-      b.onclick = () => { timeline.splice(Number(b.dataset.i), 1); renderTl(); };
-    });
-  };
-  document.querySelectorAll("#c-tl-presets .tl-btn").forEach((b) => {
-    b.onclick = () => { timeline.push({ t: nowClock(), label: b.dataset.ev }); renderTl(); };
-  });
-  const tlAdd = () => {
-    const v = val("c-tl-custom").trim();
-    if (!v) return;
-    timeline.push({ t: nowClock(), label: v });
-    document.getElementById("c-tl-custom").value = "";
-    renderTl();
-  };
-  document.getElementById("c-tl-addbtn").onclick = tlAdd;
-  document.getElementById("c-tl-custom").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") { e.preventDefault(); tlAdd(); }
-  });
-  renderTl();
   // Kuvaliitteet
   const photosEl = document.getElementById("c-photos");
   const renderPhotos = () => {
@@ -1105,7 +1048,7 @@ const GUIDE_BASE_CD = [
   "Jos ei kuljeteta: selkeät jatko-ohjeet ja turvaverkko",
 ];
 const GUIDE_CODE = {
-  "700": { primary: "ab", acute: true, ab: ["Kirjaa tapahtuma-ajat tapahtumalokiin (painelun alku, defibrillaatiot, ROSC)"], cd: [] },
+  "700": { primary: "ab", acute: true, ab: ["Paina mieleen tapahtuma-ajat (painelun alku, defibrillaatiot, ROSC) – ne ohjaavat jatkohoitoa"], cd: [] },
   "701": { primary: "ab", acute: true, ab: ["Työnjako heti selväksi: painelija, ilmatie, defibrillaattori, kirjaaja"], cd: [] },
   "702": { primary: "ab", ab: ["Matala GCS: ilmatie ja hengitys etusijalla, älä viivytä kuljetusta syyn etsinnällä"], cd: ["Seuraa tajuntaa toistuvasti – vakaakin tajunnanhäiriö voi syventyä matkalla"] },
   "703": { primary: "ab", ab: ["Uupumisen merkit ratkaisevat: tuki heti, älä jää odottamaan vastetta kohteeseen"], cd: ["Vertaa potilaan omaan normaalitilaan (esim. COPD) – kysy mikä on muuttunut"] },
@@ -1147,6 +1090,22 @@ const HUD_CODE = {
   "783": [["selkakipu.jpg", "Selkäkivun erotusdiagnostiikka"]],
   "791": [["raskaus-pregnant.jpg", "Raskausajan arviointi (PREGNANT)"], ["obstetriset-hatatilanteet.jpg", "Obstetriset hätätilanteet"]],
 };
+// Koodikohtaiset Käypä hoito -suositukset (julkiset, kaypahoito.fi).
+const KH_LINKS = {
+  "700": ["Elvytys", "https://www.kaypahoito.fi/hoi17010"],
+  "701": ["Elvytys", "https://www.kaypahoito.fi/hoi17010"],
+  "703": ["Astma", "https://www.kaypahoito.fi/hoi06030"],
+  "704": ["Sepelvaltimotautikohtaus", "https://www.kaypahoito.fi/hoi50130"],
+  "705": ["Eteisvärinä", "https://www.kaypahoito.fi/hoi50036"],
+  "706": ["Aivoinfarkti ja TIA", "https://www.kaypahoito.fi/hoi50051"],
+  "745": ["Aivovammat", "https://www.kaypahoito.fi/hoi18020"],
+  "752": ["Huumeongelmat", "https://www.kaypahoito.fi/hoi50041"],
+  "771": ["Insuliininpuutosdiabetes", "https://www.kaypahoito.fi/hoi50116"],
+  "772": ["Epileptinen kohtaus (pitkittynyt)", "https://www.kaypahoito.fi/hoi50030"],
+  "782": ["Migreeni", "https://www.kaypahoito.fi/hoi36050"],
+  "783": ["Alaselkäkipu", "https://www.kaypahoito.fi/hoi20001"],
+  "785": ["Itsemurhien ehkäisy", "https://www.kaypahoito.fi/hoi50122"],
+};
 function hudCardsHtml(code) {
   const cards = HUD_CODE[(code || "").toUpperCase()];
   if (!cards) return "";
@@ -1182,9 +1141,15 @@ function guidanceHtml(code, urgency) {
   const tier = (u === "A" || u === "B") ? "ab" : (u === "C" || u === "D") ? "cd" : null;
   const list = (arr) => `<ul class="g-list">${arr.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`;
   const what = info?.what ? `<p class="g-what">${esc(info.what)}</p>` : "";
+  // Haastattelu / selvitettävät asiat: kysymys + lyhyt perustelu (miksi kysytään)
+  const ask = info?.ask?.length ? `<div class="g-sec g-ask"><h4>🗣️ Haastattele ja selvitä</h4><ul class="g-list g-asklist">${info.ask.map((x) => {
+    const i = x.indexOf(" – ");
+    return i > 0 ? `<li><b>${esc(x.slice(0, i))}</b> – ${esc(x.slice(i + 3))}</li>` : `<li>${esc(x)}</li>`;
+  }).join("")}</ul></div>` : "";
   const actions = info?.actions?.length ? `<div class="g-sec"><h4>Hoidon linjat</h4>${list(info.actions)}</div>` : "";
   const assess = info?.assess?.length ? `<div class="g-sec"><h4>Keskeinen arvio</h4>${list(info.assess)}</div>` : "";
-  const note = `<p class="g-note">Yleistä, itse koostettua ensihoidon tietoa (lähteinä mm. StatPearls, ERC, AHA/ASA, WHO). Noudata alueellista hoito-ohjetta – ei lääkeannoksia, ei korvaa virallista ohjetta.</p>`;
+  const kh = KH_LINKS[code] ? `<a class="info-link g-kh" href="${KH_LINKS[code][1]}" target="_blank" rel="noopener">📖 Käypä hoito: ${esc(KH_LINKS[code][0])}</a>` : "";
+  const note = `<p class="g-note">Yleistä, itse koostettua ensihoidon tietoa (lähteinä mm. Käypä hoito -suositusten julkiset versiot, StatPearls, ERC, AHA/ASA, WHO). Noudata alueellista hoito-ohjetta – ei lääkeannoksia, ei korvaa virallista ohjetta.</p>`;
   const hud = hudCardsHtml(code);
   // Painotuslista näytetään vain, jos se tuo koodikohtaista lisäarvoa
   // (geneeriset perusrungot jätetään pois kun hoidon linjat + arvio kattavat sisällön).
@@ -1200,9 +1165,11 @@ function guidanceHtml(code, urgency) {
         ${tier === "cd" ? `<p class="g-hint">Hälytysasteesta riippumatta tämä tehtävä hoidetaan kiireellisen mallin mukaan.</p>` : ""}
         ${tierList(g.ab, "g-ab", "Painopisteet")}
         ${info?.red?.length ? `<div class="g-sec g-redflags"><h4>⚠️ Tunnista heti</h4>${list(info.red)}</div>` : ""}
+        ${ask}
         ${actions}
         ${assess}
         ${hud}
+        ${kh}
         ${note}
       </div>
     </details>`;
@@ -1214,9 +1181,11 @@ function guidanceHtml(code, urgency) {
         ${what}
         ${tierList(g.ab, "g-ab", "Painopisteet tällä keikalla")}
         ${info?.red?.length ? `<div class="g-sec g-redflags"><h4>⚠️ Tunnista / sulje pois heti</h4>${list(info.red)}</div>` : ""}
+        ${ask}
         ${actions}
         ${assess}
         ${hud}
+        ${kh}
         ${note}
       </div>
     </details>`;
@@ -1228,9 +1197,11 @@ function guidanceHtml(code, urgency) {
         ${what}
         ${tierList(g.cd, "g-cd", "Painopisteet tällä keikalla")}
         ${info?.red?.length ? `<div class="g-sec g-redflags"><h4>⚠️ Sulje pois ennen kuin hoidat kiireettömänä</h4>${list(info.red)}</div>` : ""}
+        ${ask}
         ${actions}
         ${assess}
         ${hud}
+        ${kh}
         ${note}
       </div>
     </details>`;
@@ -1244,9 +1215,11 @@ function guidanceHtml(code, urgency) {
       ${!g.acute ? tierList(g.ab, "g-ab", "A / B · kiireellisenä painottuu") : tierList(g.ab, "g-ab", "Painopisteet")}
       ${!g.acute ? tierList(g.cd, "g-cd", "C / D · vakaana painottuu") : ""}
       ${info?.red?.length ? `<div class="g-sec g-redflags"><h4>⚠️ Hälyttävät löydökset</h4>${list(info.red)}</div>` : ""}
+      ${ask}
       ${actions}
       ${assess}
       ${hud}
+      ${kh}
       ${note}
     </div>
   </details>`;
@@ -1431,7 +1404,6 @@ function computeAchievements(s) {
   const hasA = calls.some((c) => c.urgency === "A");
   const allUrg = ["A", "B", "C", "D"].every((u) => calls.some((c) => c.urgency === u));
   const hasX = calls.some((c) => (c.disposition || "").startsWith("X-"));
-  const hasTimeline = calls.some((c) => (c.timeline || []).length);
   const prog = (v, t) => ({ done: v >= t, value: Math.min(v, t), target: t });
   return [
     { icon: "🚑", title: "Ensimmäinen vuoro", desc: "Kirjaa ensimmäinen työvuoro", ...prog(s.shiftCount, 1) },
@@ -1449,7 +1421,6 @@ function computeAchievements(s) {
     { icon: "↩️", title: "X-tehtävä", desc: "Ensimmäinen ei-kuljetus (X-koodi)", ...prog(hasX ? 1 : 0, 1) },
     { icon: "✍️", title: "Reflektoija", desc: "10 keikkareflektiota kirjoitettu", ...prog(reflections, 10) },
     { icon: "🙋", title: "Omin käsin", desc: "10 toimenpidettä itse suorittaen", ...prog(itseCount, 10) },
-    { icon: "⏲️", title: "Tapahtumaloki", desc: "Aikaleimat kirjattu keikalle", ...prog(hasTimeline ? 1 : 0, 1) },
     { icon: "📈", title: "Rytmit haltuun", desc: "5 EKG-rytmiä hallussa", ...prog(ekg, 5) },
     { icon: "🫀", title: "EKG-mestari", desc: `Kaikki ${deck.length} rytmiä hallussa`, ...prog(ekg, deck.length) },
   ];
