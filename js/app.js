@@ -1066,7 +1066,7 @@ const GUIDE_CODE = {
   "796": { primary: "ab", ab: ["Ensimmäinen yksikkö johtaa ja tekee triagen – älä sitoudu yhteen potilaaseen"], cd: ["Pienessäkin monipotilastilanteessa: priorisointi ja selkeä työnjako ensin"] },
 };
 const GUIDE_PREFIX = {
-  trauma: { primary: "ab", ab: ["Suuri energia: kokonaisarvio ja nopea kuljetus menevät yksityiskohtien edelle"], cd: ["Paikallinen vamma: tutki huolella, arvioi toimintakyky ja kotona pärjääminen"] },
+  trauma: { primary: "ab", ab: ["Suuri energia: kokonaisarvio ja nopea kuljetus menevät yksityiskohtien edelle", "Raskaana oleva: hoida normaalein traumaperiaattein – äidin hapetus ja perfuusio on sikiön paras hoito; puolivälin jälkeen vasen kylkiasento / kohdun siirto vasemmalle"], cd: ["Paikallinen vamma: tutki huolella, arvioi toimintakyky ja kotona pärjääminen"] },
   expo: { primary: "ab", ab: ["Oma turvallisuus ja altistuksen katkaisu aina ensin"], cd: ["Kirjaa aine, määrä ja altistusaika tarkasti myös lievässä altistuksessa"] },
   bleed: { primary: "ab", ab: ["Arvioi hukattu määrä ja sokin merkit – nuori kompensoi pitkään"], cd: ["Toistuva vähäinenkin vuoto voi kertoa vakavasta syystä – matala konsultaatiokynnys"] },
   symptom: { primary: "cd", ab: ["Peruselintoimintojen häiriö kivun taustalla → hoida löydös, älä vain oiretta"], cd: ["Punaisten lippujen poissulku on kiireettömän kipukeikan tärkein tehtävä"] },
@@ -1845,6 +1845,12 @@ const MEMORY_AIDS = [
     "L – Look/gaze: katsekontakti",
     "S – Speech/cry: heikko vai kimeä itku?",
     "Tee yleisvaikutelma ovelta ennen lapseen koskemista.",
+  ]},
+  { t: "Synnyttäjä kentällä: Kysy – Katso – Päätä – Valmistaudu", items: [
+    "KYSY – raskausviikot · G/P ja aiemmat nopeat synnytykset/sektiot · supistusten tiheys ja kesto · ponnistuttaako · lapsivesi (aika + väri) · vuoto (määrä + laatu) · kivun luonne (jatkuva vai supistuksittainen) · sikiön liikkeet · tarjonta ja istukan paikka · päänsärky/näköhäiriöt/ylävatsakipu · trauma",
+    "KATSO – yleisvointi ja sokin merkit · pystyykö puhumaan supistuksen aikana · kohdun pinkeys ja arkuus · housuihin/perineumille: pää, perä, raaja, napanuora, lapsivesi, veri · vastasyntyneen hengitys, syke, jäntevyys, lämpö",
+    "PÄÄTÄ – syntyykö nyt? Jos kyllä → hoida turvallisessa paikassa kohteessa · jos ei → kuljetus vasemmassa kylkiasennossa · punainen lippu → ennakkoilmoitus ja herkästi lisäapu/konsultaatio",
+    "VALMISTAUDU – äidin verenvuotoon · huonokuntoisen vastasyntyneen ventilointiin · ennenaikaisen lämpötalouteen · napanuorakomplikaatioon, perätilaan ja hartiadystokiaan",
   ]},
   { t: "PREGNANT – raskausajan arviointi", img: HUD + "raskaus-pregnant.jpg", items: [
     "P – Raskaushistoria (Gravida/Para, aiemmat sektiot)",
