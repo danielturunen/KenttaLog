@@ -1146,7 +1146,11 @@ function guidanceHtml(code, urgency) {
     const i = x.indexOf(" – ");
     return i > 0 ? `<li><b>${esc(x.slice(0, i))}</b> – ${esc(x.slice(i + 3))}</li>` : `<li>${esc(x)}</li>`;
   }).join("")}</ul></div>` : "";
-  const actions = info?.actions?.length ? `<div class="g-sec"><h4>Hoidon linjat</h4>${list(info.actions)}</div>` : "";
+  // Vaiheistettu toimintaprotokolla (esim. matkasynnytys): otsikoidut vaiheet,
+  // numeroitu lista kun suoritusjärjestys on olennainen (ord: true).
+  const steps = info?.steps?.length ? info.steps.map((s) =>
+    `<div class="g-sec g-steps"><h4>${esc(s.t)}</h4><${s.ord ? "ol" : "ul"} class="g-list">${s.items.map((i) => `<li>${esc(i)}</li>`).join("")}</${s.ord ? "ol" : "ul"}></div>`).join("") : "";
+  const actions = steps + (info?.actions?.length ? `<div class="g-sec"><h4>Hoidon linjat</h4>${list(info.actions)}</div>` : "");
   const assess = info?.assess?.length ? `<div class="g-sec"><h4>Keskeinen arvio</h4>${list(info.assess)}</div>` : "";
   const kh = KH_LINKS[code] ? `<a class="info-link g-kh" href="${KH_LINKS[code][1]}" target="_blank" rel="noopener">📖 Käypä hoito: ${esc(KH_LINKS[code][0])}</a>` : "";
   const note = `<p class="g-note">Yleistä, itse koostettua ensihoidon tietoa (lähteinä mm. Käypä hoito -suositusten julkiset versiot, StatPearls, ERC, AHA/ASA, WHO). Noudata alueellista hoito-ohjetta – ei lääkeannoksia, ei korvaa virallista ohjetta.</p>`;
