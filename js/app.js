@@ -2,9 +2,7 @@ import {
   getShifts, getShift, addShift, updateShift, deleteShift,
   addCall, updateCall, deleteCall, getAllCalls,
   getSettings, updateSettings,
-  getCodeNote, setCodeNote,
   exportJSON, importJSON, clearAll,
-  exportCodeNotes, importCodeNotes,
 } from "./storage.js";
 import { CODE_GROUPS, CODE_MAP, ALL_CODES, URGENCY, PROCEDURES, X_SUBCODES } from "./codes.js";
 import { codeInfo } from "./codeinfo.js";
@@ -791,7 +789,6 @@ function openCallForm(shiftId, existing) {
       <div class="quickcodes" id="c-quick">${quickCodesHtml(c.code)}</div>
       <div class="hint" id="c-codehint">${codeHint(c.code)}</div>
       <a class="info-link" id="c-info" href="${infoUrlForCode(c.code)}" target="_blank" rel="noopener">ⓘ Lisätiedot ensihoito-online.fi</a>
-      <div class="code-note" id="c-note">${codeNoteHtml(c.code)}</div>
     </label>
     <p class="form-note">Voit tallentaa pelkän hälytyskoodin nyt ja täydentää loput myöhemmin.</p>
     <div id="c-guide">${guidanceHtml(c.code, c.urgency)}</div>
@@ -961,7 +958,6 @@ function openCallForm(shiftId, existing) {
     const code = search.value.trim().toUpperCase();
     document.getElementById("c-codehint").innerHTML = codeHint(code);
     document.getElementById("c-info").href = infoUrlForCode(code);
-    document.getElementById("c-note").innerHTML = codeNoteHtml(code);
     refreshGuide();
     document.querySelectorAll("#c-quick .qc-chip").forEach((x) => x.classList.toggle("on", x.dataset.qc === code));
     if (!tcodeEdited) tcodeEl.value = code;
@@ -970,14 +966,6 @@ function openCallForm(shiftId, existing) {
   document.querySelectorAll("#c-quick .qc-chip").forEach((b) => {
     b.onclick = () => { search.value = b.dataset.qc; applyCode(); };
   });
-  document.getElementById("c-note").onclick = (e) => {
-    const a = e.target.closest("[data-editnote]");
-    if (!a) return;
-    e.preventDefault();
-    openCodeNote(a.dataset.editnote, () => {
-      document.getElementById("c-note").innerHTML = codeNoteHtml(search.value.trim().toUpperCase());
-    });
-  };
   const descEl = document.getElementById("c-desc");
   descEl.addEventListener("input", () => {
     document.getElementById("c-tips").innerHTML = tipsHtml(tipsFor(descEl.value));
@@ -1101,53 +1089,6 @@ function quickCodesHtml(currentCode) {
     return `<button type="button" class="qc-chip ${cur === code ? "on" : ""}" data-qc="${esc(code)}"><b>${esc(code)}</b> ${esc(name)}</button>`;
   }).join("")}</div>`;
 }
-// Kevyt, turvallinen Markdown-muotoilu omille muistiinpanoille.
-// Tukee: # otsikot, **lihavointi**, *kursiivi*, - / 1. listat, [linkki](url),
-// ![kuva](url) ja `koodi`. Teksti escapetataan AINA ennen muotoilua.
-function mdInline(s) {
-  // s on jo HTML-escapattu
-  s = s.replace(/!\[([^\]]*)\]\((https?:[^)\s]+)\)/g, (_m, alt, url) => `<img class="cn-img" src="${url}" alt="${alt}" loading="lazy">`);
-  s = s.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, (_m, t, url) => `<a href="${url}" target="_blank" rel="noopener">${t}</a>`);
-  s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-  s = s.replace(/(^|[\s(>])\*([^*\n]+)\*/g, "$1<em>$2</em>");
-  s = s.replace(/(^|[\s(>])_([^_\n]+)_/g, "$1<em>$2</em>");
-  s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
-  return s;
-}
-function renderNoteMarkdown(md) {
-  const lines = String(md || "").replace(/\r\n/g, "\n").split("\n");
-  const out = [];
-  let listType = null;
-  const closeList = () => { if (listType) { out.push(`</${listType}>`); listType = null; } };
-  let para = [];
-  const flushPara = () => { if (para.length) { out.push(`<p>${mdInline(esc(para.join(" ")))}</p>`); para = []; } };
-  for (const raw of lines) {
-    const line = raw.replace(/\s+$/, "");
-    if (!line.trim()) { flushPara(); closeList(); continue; }
-    let m;
-    if ((m = line.match(/^(#{1,4})\s+(.*)$/))) {
-      flushPara(); closeList();
-      const lvl = Math.min(m[1].length + 2, 6);
-      out.push(`<h${lvl} class="cn-h">${mdInline(esc(m[2]))}</h${lvl}>`);
-    } else if ((m = line.match(/^!\[([^\]]*)\]\((https?:[^)\s]+)\)\s*$/))) {
-      flushPara(); closeList();
-      out.push(`<img class="cn-img" src="${esc(m[2])}" alt="${esc(m[1])}" loading="lazy">`);
-    } else if ((m = line.match(/^[-*•]\s+(.*)$/))) {
-      flushPara();
-      if (listType !== "ul") { closeList(); out.push('<ul class="cn-ul">'); listType = "ul"; }
-      out.push(`<li>${mdInline(esc(m[1]))}</li>`);
-    } else if ((m = line.match(/^\d+[.)]\s+(.*)$/))) {
-      flushPara();
-      if (listType !== "ol") { closeList(); out.push('<ol class="cn-ol">'); listType = "ol"; }
-      out.push(`<li>${mdInline(esc(m[1]))}</li>`);
-    } else {
-      para.push(line.trim());
-    }
-  }
-  flushPara(); closeList();
-  return out.join("");
-}
-
 // ---- Kiireellisyyspainotukset per tehtäväkoodi ----
 // Työnjako sisällössä (ei toistoa):
 //   ab/cd (tässä)        = 1–2 riviä: mikä juuri tällä kiireellisyydellä painottuu
@@ -1310,45 +1251,6 @@ function guidanceHtml(code, urgency) {
     </div>
   </details>`;
 }
-function guidanceMarkdown(code, urgency) {
-  code = (code || "").toUpperCase();
-  const g = codeGuidance(code);
-  if (!g) return "";
-  const info = codeInfo(code);
-  const u = (urgency || "").toUpperCase();
-  const tier = (u === "A" || u === "B") ? "ab" : (u === "C" || u === "D") ? "cd" : null;
-  const sec = (title, arr) => arr?.length ? `### ${title}\n${arr.map((x) => `- ${x}`).join("\n")}\n\n` : "";
-  const showTier = (arr) => arr.length && !(g.generic && info);
-  let md = "";
-  if (info?.what) md += `${info.what}\n\n`;
-  if (g.acute) {
-    md += `**Aina kiireellinen tehtävä hälytysasteesta riippumatta.**\n\n`;
-    if (showTier(g.ab)) md += sec("Painopisteet", g.ab);
-    md += sec("Tunnista heti", info?.red);
-  } else if (tier === "ab") {
-    if (showTier(g.ab)) md += sec("Kiireellisenä painottuu", g.ab);
-    md += sec("Sulje pois / tunnista heti", info?.red);
-  } else if (tier === "cd") {
-    if (showTier(g.cd)) md += sec("Vakaana painottuu", g.cd);
-    md += sec("Sulje pois ennen kiireetöntä linjaa", info?.red);
-  } else {
-    if (showTier(g.ab)) md += sec("A/B – kiireellisenä painottuu", g.ab);
-    if (showTier(g.cd)) md += sec("C/D – vakaana painottuu", g.cd);
-    md += sec("Hälyttävät löydökset", info?.red);
-  }
-  if (info) md += sec("Hoidon linjat", info.actions);
-  if (info) md += sec("Keskeinen arvio", info.assess);
-  return md.trimEnd() + "\n";
-}
-
-function codeNoteHtml(code) {
-  code = (code || "").toUpperCase();
-  if (!CODE_MAP.get(code)) return "";
-  const note = getCodeNote(code);
-  if (note) return `<div class="cn-show cn-rich">${renderNoteMarkdown(note)}<a href="#" class="cn-edit" data-editnote="${esc(code)}">✎ muokkaa</a></div>`;
-  return `<a href="#" class="cn-add" data-editnote="${esc(code)}">+ Lisää hoito-ohje / muistiinpano</a>`;
-}
-
 // ---------- Kaikki keikat (haku + suodatus) ----------
 let callFilter = { q: "", urgency: "", lead: "", incomplete: false };
 function renderCalls() {
@@ -1821,7 +1723,7 @@ function renderCodes() {
         });
         if (!codes.length) return "";
         return `<div class="codecat"><h3>${esc(cat.title)}</h3>${codes.map(([code, name]) =>
-          `<button type="button" class="coderow" data-code="${esc(code)}"><span class="code" style="--lc:${g.color}">${esc(code)}</span><span class="cname">${esc(name)}</span>${getCodeNote(code) ? `<span class="coderow-note">📝</span>` : ""}<span class="coderow-go">›</span></button>${subcodesHtml(code, q)}`).join("")}</div>`;
+          `<button type="button" class="coderow" data-code="${esc(code)}"><span class="code" style="--lc:${g.color}">${esc(code)}</span><span class="cname">${esc(name)}</span><span class="coderow-go">›</span></button>${subcodesHtml(code, q)}`).join("")}</div>`;
       }).join("");
       if (!cats) return "";
       return `<section class="codegroup"><div class="grouphead" style="--lc:${g.color}">${esc(g.label)}</div>${cats}</section>`;
@@ -1830,51 +1732,20 @@ function renderCodes() {
   const cq = document.getElementById("cq");
   cq.oninput = debounce(() => { codeQuery = cq.value; renderCodes(); restoreFocus("cq"); }, 200);
   app.querySelectorAll("[data-code]").forEach((el) => {
-    el.onclick = () => openCodeNote(el.dataset.code, () => renderCodes());
+    el.onclick = () => openCodeInfo(el.dataset.code);
   });
 }
 
 // Koodikohtainen muistiinpano + virallinen lähde. Käyttäjän oma teksti, tallentuu laitteelle.
-function openCodeNote(code, after) {
+// Koodin tietonäkymä: virallinen linkki, tarkenteet ja hoidon ohje (vain luku).
+function openCodeInfo(code) {
   const info = CODE_MAP.get(code);
-  const note = getCodeNote(code);
   openModal(`${code}${info ? " · " + info.name : ""}`, `
     ${info ? `<p class="muted">${esc(info.lead)} · ${esc(info.category)}</p>` : ""}
     <a class="info-link" href="${infoUrlForCode(code)}" target="_blank" rel="noopener">ⓘ Avaa virallinen lisätieto (ensihoito-online.fi)</a>
     ${X_SUBCODES[code] ? `<div class="subcodes-block"><div class="subcodes-h">Tarkenteet (alakoodit)</div>${subcodesHtml(code, "")}</div>` : ""}
     ${guidanceHtml(code)}
-    <label style="margin-top:12px">Hoito-ohje / muistiinpano
-      <textarea id="cn-text" rows="10" placeholder="Kirjoita tai liitä omat muistilistasi / hoito-ohjeesi tästä tehtävästä.">${esc(note)}</textarea>
-    </label>
-    <button type="button" class="btn-sm ghost" id="cn-tpl">＋ Lisää ohjerunko pohjaksi</button>
-    <p class="cn-help">Muotoilu: <code># Otsikko</code> · <code>**lihavointi**</code> · <code>- lista</code> · <code>[linkki](url)</code> · <code>![kuva](url)</code></p>
-    <div class="cn-prev-wrap">
-      <div class="cn-prev-lab">Esikatselu</div>
-      <div class="cn-rich" id="cn-prev">${note ? renderNoteMarkdown(note) : '<p class="muted">Esikatselu näkyy tässä kun kirjoitat…</p>'}</div>
-    </div>
-    <p class="form-note">Tallentuu vain tähän laitteeseen (ei julkiseen versionhallintaan). Voit liittää tähän oman materiaalisi.</p>
-  `, {
-    onSave: () => {
-      setCodeNote(code, val("cn-text"));
-      closeModal();
-      if (after) after();
-    },
-  });
-  const ta = document.getElementById("cn-text");
-  const prev = document.getElementById("cn-prev");
-  const refreshPrev = () => {
-    const v = ta.value.trim();
-    prev.innerHTML = v ? renderNoteMarkdown(v) : '<p class="muted">Esikatselu näkyy tässä kun kirjoitat…</p>';
-  };
-  if (ta && prev) ta.addEventListener("input", refreshPrev);
-  const tplBtn = document.getElementById("cn-tpl");
-  if (tplBtn) tplBtn.onclick = () => {
-    const tpl = guidanceMarkdown(code);
-    if (!tpl) return;
-    ta.value = ta.value.trim() ? ta.value.replace(/\s*$/, "") + "\n\n" + tpl : tpl;
-    refreshPrev();
-    ta.focus();
-  };
+  `);
 }
 
 // Yleisesti opetetut kliiniset muistilistat (ei Ensihoito-oppaasta kopioitua sisältöä).
@@ -2743,16 +2614,6 @@ function renderSettings() {
       <p class="form-note">Vinkki: lisää sovellus aloitusnäyttöön (Jaa → Lisää Koti-valikkoon) jokaisella laitteella, niin se toimii kuin natiivisovellus ja offline.</p>
     </section>
 
-    <section class="settings-block">
-      <h2>Omat koodimuistiinpanot</h2>
-      <p class="muted">Vie ja tuo omat koodikohtaiset muistiinpanosi erillisenä tiedostona (esim. toiselle laitteelle). Tuonti yhdistyy nykyisiin – ne näkyvät heti koodeilla ja keikkalomakkeessa.</p>
-      <div class="btn-row">
-        <button class="btn" id="expNotes">⬇︎ Vie muistiinpanot</button>
-        <button class="btn" id="impNotesBtn">⬆︎ Tuo muistiinpanot</button>
-        <input type="file" id="impNotesFile" accept="application/json" hidden>
-      </div>
-    </section>
-
     <section class="settings-block danger-block">
       <h2>Vaara-alue</h2>
       <button class="btn danger" id="wipe">Tyhjennä kaikki tiedot</button>
@@ -2808,22 +2669,6 @@ function renderSettings() {
     };
     reader.readAsText(file);
   };
-  document.getElementById("expNotes").onclick = () => shareOrDownload("kenttalog-muistiinpanot.json", exportCodeNotes(), "application/json");
-  document.getElementById("impNotesBtn").onclick = () => document.getElementById("impNotesFile").click();
-  document.getElementById("impNotesFile").onchange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const n = importCodeNotes(reader.result);
-        toast(`${n} muistiinpanoa tuotu`);
-      } catch (err) {
-        alert("Tuonti epäonnistui: " + err.message);
-      }
-    };
-    reader.readAsText(file);
-  };
   document.getElementById("wipe").onclick = () => {
     if (confirm("Poistetaanko KAIKKI vuorot ja keikat pysyvästi? Tätä ei voi perua.")) {
       clearAll();
@@ -2846,14 +2691,14 @@ function openModal(title, bodyHtml, { onSave, extra } = {}) {
       <div class="modal-body">${bodyHtml}</div>
       <div class="modal-foot">
         ${extra ? `<button class="btn ${extra.danger ? "danger" : ""}" id="m-extra">${esc(extra.label)}</button>` : "<span></span>"}
-        <button class="btn primary" id="m-save">Tallenna</button>
+        ${onSave ? `<button class="btn primary" id="m-save">Tallenna</button>` : `<button class="btn" id="m-save">Sulje</button>`}
       </div>
     </div>`;
   document.body.appendChild(wrap);
   document.body.classList.add("modal-open");
   wrap.querySelector("#m-close").onclick = closeModal;
   wrap.onclick = (e) => { if (e.target === wrap) closeModal(); };
-  wrap.querySelector("#m-save").onclick = onSave;
+  wrap.querySelector("#m-save").onclick = onSave || closeModal;
   if (extra) wrap.querySelector("#m-extra").onclick = extra.action;
   wrap._onKey = (e) => { if (e.key === "Escape") closeModal(); };
   document.addEventListener("keydown", wrap._onKey);

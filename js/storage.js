@@ -40,8 +40,6 @@ const DEFAULT_DATA = {
     ekgCards: [],
     // Viimeisimmän varmuuskopion päivä (muistutusta varten)
     lastBackup: "",
-    // Käyttäjän omat muistiinpanot per tehtäväkoodi: { "704": "omin sanoin..." }
-    codeNotes: {},
   },
 };
 
@@ -172,19 +170,6 @@ export function updateSettings(patch) {
   return data.settings;
 }
 
-// ---- Omat koodimuistiinpanot ----
-export function getCodeNote(code) {
-  return load().settings.codeNotes?.[code] || "";
-}
-export function setCodeNote(code, text) {
-  const data = load();
-  if (!data.settings.codeNotes) data.settings.codeNotes = {};
-  const t = (text || "").trim();
-  if (t) data.settings.codeNotes[code] = t;
-  else delete data.settings.codeNotes[code];
-  save();
-}
-
 // ---- Varmuuskopio ----
 
 export function exportJSON() {
@@ -205,23 +190,6 @@ export function importJSON(json) {
 export function clearAll() {
   cache = structuredClone(DEFAULT_DATA);
   save();
-}
-
-// ---- Koodimuistiinpanojen erillinen vienti / tuonti ----
-export function exportCodeNotes() {
-  return JSON.stringify({ kind: "kenttalog-codenotes", codeNotes: load().settings.codeNotes || {} }, null, 2);
-}
-
-export function importCodeNotes(json, { merge = true } = {}) {
-  const parsed = JSON.parse(json);
-  const notes = parsed && parsed.codeNotes ? parsed.codeNotes : (parsed && typeof parsed === "object" ? parsed : null);
-  if (!notes || typeof notes !== "object") {
-    throw new Error("Tiedosto ei ole kelvollinen muistiinpanotiedosto.");
-  }
-  const data = load();
-  data.settings.codeNotes = merge ? { ...(data.settings.codeNotes || {}), ...notes } : { ...notes };
-  save();
-  return Object.keys(notes).length;
 }
 
 // ---- CSV-vienti ----
