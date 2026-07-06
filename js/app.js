@@ -1141,6 +1141,8 @@ function guidanceHtml(code, urgency) {
   const tier = (u === "A" || u === "B") ? "ab" : (u === "C" || u === "D") ? "cd" : null;
   const list = (arr) => `<ul class="g-list">${arr.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`;
   const what = info?.what ? `<p class="g-what">${esc(info.what)}</p>` : "";
+  // Aikatavoitteet: mitä pitäisi olla tehtynä mihinkin mennessä (yleiset opetustavoitteet)
+  const timeGoals = info?.time?.length ? `<div class="g-time"><span class="g-time-lab">⏱ Aikatavoitteet</span>${info.time.map((t) => `<span class="g-time-item">${esc(t)}</span>`).join("")}</div>` : "";
   // Haastattelu / selvitettävät asiat: kysymys + lyhyt perustelu (miksi kysytään)
   const ask = info?.ask?.length ? `<div class="g-sec g-ask"><h4>🗣️ Haastattele ja selvitä</h4><ul class="g-list g-asklist">${info.ask.map((x) => {
     const i = x.indexOf(" – ");
@@ -1166,6 +1168,7 @@ function guidanceHtml(code, urgency) {
       <div class="g-title">🚨 ${esc(u)}-${esc(code)} · aina kiireellinen tehtävä</div>
       <div class="g-body">
         ${what}
+        ${timeGoals}
         ${tier === "cd" ? `<p class="g-hint">Hälytysasteesta riippumatta tämä tehtävä hoidetaan kiireellisen mallin mukaan.</p>` : ""}
         ${tierList(g.ab, "g-ab", "Painopisteet")}
         ${info?.red?.length ? `<div class="g-sec g-redflags"><h4>⚠️ Tunnista heti</h4>${list(info.red)}</div>` : ""}
@@ -1183,6 +1186,7 @@ function guidanceHtml(code, urgency) {
       <div class="g-title">🚨 ${esc(u)}-${esc(code)} · kiireellinen lähestyminen</div>
       <div class="g-body">
         ${what}
+        ${timeGoals}
         ${tierList(g.ab, "g-ab", "Painopisteet tällä keikalla")}
         ${info?.red?.length ? `<div class="g-sec g-redflags"><h4>⚠️ Tunnista / sulje pois heti</h4>${list(info.red)}</div>` : ""}
         ${ask}
@@ -1199,6 +1203,7 @@ function guidanceHtml(code, urgency) {
       <div class="g-title">🩺 ${esc(u)}-${esc(code)} · vakaa, kiireetön lähestyminen</div>
       <div class="g-body">
         ${what}
+        ${timeGoals}
         ${tierList(g.cd, "g-cd", "Painopisteet tällä keikalla")}
         ${info?.red?.length ? `<div class="g-sec g-redflags"><h4>⚠️ Sulje pois ennen kuin hoidat kiireettömänä</h4>${list(info.red)}</div>` : ""}
         ${ask}
@@ -1215,6 +1220,7 @@ function guidanceHtml(code, urgency) {
     <div class="g-title">🧭 Tietoa tehtävästä & lähestyminen kiireellisyyden mukaan</div>
     <div class="g-body">
       ${what}
+      ${timeGoals}
       ${g.acute ? `<p class="g-hint">Aina kiireellinen tehtävä hälytysasteesta riippumatta.</p>` : `<p class="g-hint">Valitse hälytysaste, niin näet juuri sille keikalle painottuvan ohjeen.</p>`}
       ${!g.acute ? tierList(g.ab, "g-ab", "A / B · kiireellisenä painottuu") : tierList(g.ab, "g-ab", "Painopisteet")}
       ${!g.acute ? tierList(g.cd, "g-cd", "C / D · vakaana painottuu") : ""}

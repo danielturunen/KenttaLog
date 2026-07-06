@@ -352,6 +352,9 @@ a { color: inherit; text-decoration: none; }
 .g-sec h4 { margin: 0 0 4px; font-size: .82rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 .g-redflags { background: color-mix(in srgb, #e5484d 12%, var(--surface)); border-radius: var(--radius-sm); padding: 9px 11px; }
 .g-redflags h4 { color: #ff8088; }
+.g-time { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 2px 0 4px; }
+.g-time-lab { font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: #f5b301; }
+.g-time-item { font-size: .78rem; font-weight: 600; background: color-mix(in srgb, #f5b301 14%, var(--surface)); border: 1px solid color-mix(in srgb, #f5b301 32%, var(--border)); color: var(--text); border-radius: 999px; padding: 3px 10px; }
 .g-steps { background: var(--surface-2); border-radius: var(--radius-sm); padding: 9px 11px; }
 .g-steps h4 { color: var(--primary); }
 .g-steps ol.g-list { padding-left: 22px; }
