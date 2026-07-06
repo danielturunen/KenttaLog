@@ -159,7 +159,7 @@ export const CODE_INFO = {
   },
   "714": {
     what: "Hukkuminen / hukuksiin joutuminen. Hypoksinen tapahtuma – hoidon ydin on happeutumisen palauttaminen.",
-    time: ["alkupuhallukset heti pelastamisen jälkeen", "hätätoimet 0–5 min", "hypoterminen eloton: kuljetus elvyttäen käyntiin nopeasti"],
+    time: ["alkupuhallukset ja painelu välittömästi – myös vedessä, jos osaamista", "ensiarvio ja hätätoimet 0–5 min", "välitön ensihoito elossa olevalle 6–15 min", "kuljetuskuntoon 16–30 min", "hypoterminen eloton: harkitse välitöntä kuljetusta elvyttäen"],
     ask: [
       "Kauanko veden alla tai vedessä? – lämpimässä vedessä ennuste heikkenee ~10 min jälkeen; yli 30 min uponneena ennuste on huono veden lämmöstä riippumatta",
       "Veden lämpötila? – hyvin kylmä vesi (< ~10 °C) voi jäähdyttää suojaavasti ennen hypoksiaa: lapsilla selviytymisiä jopa 45–60 min jääkylmästä vedestä → elvytä pitkään",
@@ -174,7 +174,7 @@ export const CODE_INFO = {
   // ---------- Vamma ----------
   "741": {
     what: "Putoaminen – epäile monivammaa korkeudesta riippuen.",
-    time: ["massiivivuoto kiinni ~1 min", "ilmatie ~2 min", "kriittisellä kohdeaika ≤ 10 min ('platinum 10')", "kiireellinen kuljetus käyntiin 15–30 min"],
+    time: ["massiivivuoto kiinni 1 min", "ilmatie ja hengityksen riittävyys varmistettu 2 min", "tarkennettu arvio ja välittömät hoitotoimet alle 10 min", "kiireellinen kuljetus käyntiin 15–30 min – hoito jatkuu matkalla"],
     ask: [
       "Mistä korkeudesta ja mille alustalle? – energia määrää vammaepäilyn",
       "Miksi putosi: liukastui vai tuliko sairauskohtaus? – syy voi olla tärkeämpi kuin seuraus",
@@ -187,7 +187,7 @@ export const CODE_INFO = {
   },
   "744": {
     what: "Haava ja siihen liittyvä verenvuoto.",
-    time: ["henkeä uhkaava vuoto kiinni ~1 min", "amputaatiossa varhainen yhteys replantaatioyksikköön – iskemia-aika ratkaisee"],
+    time: ["henkeä uhkaava vuoto kiinni välittömästi", "amputaatti: lihaskudosta sisältävän replantaatio 8 h, muun kudoksen 16 h – yhteys hoitopaikkaan etukäteen, tarvittaessa ilmakuljetus"],
     ask: [
       "Millä ja milloin haava syntyi? – likainen/syvä mekanismi ohjaa jatkohoitoa",
       "Paljonko on vuotanut ennen saapumista? – hukatun veren arvio",
@@ -200,7 +200,7 @@ export const CODE_INFO = {
   },
   "745": {
     what: "Kaatuminen (matala energia, usein iäkkäät).",
-    time: ["tajunnanlasku ja ilmatieuhka tunnistettu ~1 min", "neurologinen tila ja vammastatus ~5 min", "aivovammaepäilyssä kuljetus käyntiin ~20 min"],
+    time: ["tajunnanlasku ja ilmatieuhka tunnistettu 1 min – lääkäriyksikkö hälytetty", "verenkierto, neurologinen tila ja vammastatus kartoitettu 5 min", "kuljetus käyntiin 20 min, ellei ilmatien varmistusta tehdä kohteessa"],
     ask: [
       "Miksi kaatui: kompastui vai huimasi/pyörtyi ensin? – sairauskohtaus kaatumisen takana on löydettävä",
       "Löikö päänsä? Muistikatko tapahtumasta? – aivovamman merkit",
@@ -214,7 +214,7 @@ export const CODE_INFO = {
   },
   "746": {
     what: "Isku / törmäys kehoon.",
-    time: ["massiivivuoto kiinni ~1 min", "ilmatie ~2 min", "lävistävässä vartalovammassa hätäkuljetustarve arvioitu < 10 min"],
+    time: ["massiivivuoto kiinni 1 min", "ilmatie ja hengitys varmistettu 2 min", "hätäkuljetuksen tarve arvioitu alle 10 min", "lävistävässä kiireellinen kuljetus käyntiin 15 min"],
     ask: [
       "Mihin osui ja millä voimalla/välineellä? – energia ja sisäelinvamman riski",
       "Lisääntyykö vatsan tai rinnan kipu? – kehittyvä sisäinen vuoto",
@@ -226,7 +226,7 @@ export const CODE_INFO = {
   },
   "747": {
     what: "Puristuminen tai muu mekaaninen vamma.",
-    time: ["massiivivuoto kiinni ~1 min", "kriittisellä kohdeaika ≤ 10 min"],
+    time: ["massiivivuoto kiinni 1 min", "ilmatie 2 min", "käsitys vammoista ja hätäkuljetustarpeesta 5 min", "räjähdys-/monivammassa hätäkuljetus käyntiin 10 min, kiireellinen 25 min"],
     ask: [
       "Kuinka kauan puristuksissa ja mikä kehonosa? – pitkä puristus → vapautuksen jälkeiset metaboliset riskit",
       "Miten vapautui / vapautetaanko vasta nyt? – ajoita hoito vapautukseen",
@@ -263,7 +263,7 @@ export const CODE_INFO = {
   },
   "753": {
     what: "Sähköisku tai salamanisku.",
-    time: ["irti virtalähteestä heti kun turvallista", "eloton: elvytys välittömästi"],
+    time: ["irti virtalähteestä niin nopeasti kuin on turvallista", "elvytys tai elintoimintojen turvaaminen välittömästi"],
     ask: [
       "Mikä jännite: taloussähkö (230 V) vai suurjännite? – suurjännite = aina korkea riski ja aina sairaalaan, vaikka oireeton",
       "Virran reitti: kädestä käteen tai rintakehän läpi? Kauanko kiinni virtalähteessä? – rytmihäiriöriski",
@@ -277,7 +277,7 @@ export const CODE_INFO = {
   },
   "754": {
     what: "Palovamma (kuumuus, kemikaali, sähkö).",
-    time: ["ilmatieuhka tunnistettu ja lisäapu hälytetty ~1 min", "100 % happi varaajamaskilla ~2 min"],
+    time: ["ilmatien menetys tai sen uhka tunnistettu 1 min – samalla lisäapu hälytetty", "ilmatie varmistettu ja 100 % happi varaajamaskilla 2 min"],
     ask: [
       "Mikä paloi ja missä tilassa? Suljettu tila? – hengitystiepalovamman ja häkäaltistuksen riski",
       "Kuinka kauan altistui ja onko jäähdytys aloitettu? – jäähdytyksen hyöty ensimmäisinä minuutteina",
@@ -289,7 +289,7 @@ export const CODE_INFO = {
   },
   "755": {
     what: "Ylilämpöisyys (lämpöuupumus / lämpöhalvaus).",
-    time: ["lämpöaltistus poikki ja jäähdytys käyntiin heti (0–5 min)"],
+    time: ["lämpöaltistus poikki heti – jäähdytys ja hätätoimet 0–5 min", "välitön ensihoito 6–15 min", "kuljetuskuntoon 16–30 min"],
     ask: [
       "Olosuhteet ja altistuksen kesto? Rasitus? – lämpöhalvauksen riski",
       "Onko juonut ja mitä? – nestehukan arvio",
@@ -301,7 +301,7 @@ export const CODE_INFO = {
   },
   "756": {
     what: "Paleltuminen / alilämpöisyys (hypotermia).",
-    time: ["sykkeen ja hengityksen etsintä jopa 1 min ennen elottomaksi toteamista", "eloton: painelu + defibrillointi 2 min kuluessa", "elvyttäen kuljetus käyntiin ~5 min kohtaamisesta"],
+    time: ["sykkeen ja hengityksen toteamiseen syvässä hypotermiassa jopa 1 min", "eloton: painelu ja defibrillointi (VF) 2 min kuluessa", "elvyttäen kuljetus käyntiin 5 min kohtaamisesta"],
     ask: [
       "Kauanko kylmässä ja millaisissa olosuhteissa (märkä, tuuli, vesi)? – jäähtymisnopeus",
       "Milloin viimeksi nähty tai varmuudella elossa? – alle ~2 h sitten elossa ollut hypoterminen eloton on usein elvytettävissä",
@@ -314,7 +314,7 @@ export const CODE_INFO = {
   // ---------- Verenvuoto (ilman vammaa) ----------
   "761": {
     what: "Verenvuoto suusta (mm. ruoansulatuskanava, hengitystiet).",
-    time: ["sokkisella suoniyhteys ja kuljetus käyntiin 5–15 min"],
+    time: ["vuodon määrän arvio ja välitön ensihoito 5 min", "kuljetus käyntiin 5–25 min – sokkisella heti"],
     ask: [
       "Tuoretta verta vai kahvinporomaista? Oksennus vai yskös? – vuodon lähde ja tuoreus",
       "Maksasairaus tai runsas alkoholinkäyttö? – laskimolaajentumavuodon riski",
@@ -344,6 +344,7 @@ export const CODE_INFO = {
   },
   "763": {
     what: "Verenvuoto korvasta tai nenästä.",
+    time: ["vuodon arvio ja välitön ensihoito 5–15 min", "tarvittaessa kuljetus käyntiin 16–25 min"],
     ask: [
       "Trauma vai spontaani? – trauman jälkeinen korvavuoto viittaa kallonpohjan vammaan",
       "Verenohennuslääkitys tai verenpainetauti? – pitkittyneen vuodon taustat",
@@ -355,6 +356,7 @@ export const CODE_INFO = {
   },
   "764": {
     what: "Muu verenvuoto (esim. raaja).",
+    time: ["vuodon arvio ja välitön ensihoito 5–15 min", "tarvittaessa kuljetus käyntiin 16–25 min"],
     ask: [
       "Mistä vuotaa ja kauanko on vuotanut? – hukatun määrän arvio",
       "Verenohennuslääkitys? – vuoto ei asetu tavalliseen tapaan",
@@ -406,7 +408,7 @@ export const CODE_INFO = {
   },
   "773": {
     what: "Yliherkkyysreaktio / anafylaksia.",
-    time: ["anafylaksiassa adrenaliini < 5 min – mieluiten heti"],
+    time: ["altistus poikki heti", "vaikeassa reaktiossa adrenaliini alle 5 min", "välitön muu ensihoito 6–15 min", "kuljetuskuntoon 16–30 min"],
     ask: [
       "Mille altistui ja milloin? – ruoka, lääke, pistiäinen",
       "Kuinka nopeasti oireet alkoivat? – sekunneissa/minuuteissa alkava = anafylaksia",
@@ -532,7 +534,7 @@ export const CODE_INFO = {
   },
   "791": {
     what: "Synnytys / synnytyksen käynnistyminen. Matkasynnytyksen vaiheistettu toimintaohje alla (Selvitä → Tutki → Valmistaudu → Ponnistusvaihe → Syntymän jälkeen).",
-    time: ["eklampsiakouristus: ilmatie ~2 min, lääkehoito ~5 min, hätäkuljetus käyntiin ~15 min"],
+    time: ["eklampsia: kouristelevan ilmatie-/hengitysongelma tunnistettu ja hoidettu 2 min (vasen kylkiasento)", "kouristelun lääkehoito alkanut 5 min", "hätäkuljetukseen lähtö 15 min"],
     // 1. SELVITÄ – haastattelu (+ neuvolakortti kun kiireellisyys arvioitu)
     ask: [
       "Raskauden kesto (viikot) ja laskettu aika? – ennenaikaisuus (< 37+0, erityisesti < 32 vk) nostaa riskiä",
