@@ -1109,7 +1109,7 @@ const KH_LINKS = {
 function hudCardsHtml(code) {
   const cards = HUD_CODE[(code || "").toUpperCase()];
   if (!cards) return "";
-  return `<details class="g-sec g-hud"><summary>📋 Kenttäoppaan kortit (${cards.length})</summary>
+  return `<details class="g-sec g-hud" open><summary>📋 Kenttäoppaan kortit (${cards.length})</summary>
     ${cards.map(([f, t]) => `<figure class="hud-fig"><img class="hud-img" src="${HUD_BASE}${f}" alt="${esc(t)}" loading="lazy"><figcaption>${esc(t)}</figcaption></figure>`).join("")}
   </details>`;
 }
@@ -1162,8 +1162,8 @@ function guidanceHtml(code, urgency) {
 
   // Aina kiireellinen tehtävä (esim. eloton/elvytys): C/D-valinta ei muuta lähestymistä
   if (g.acute && tier) {
-    return `<details class="guidance g-acute" open>
-      <summary>🚨 ${esc(u)}-${esc(code)} · aina kiireellinen tehtävä</summary>
+    return `<section class="guidance g-acute">
+      <div class="g-title">🚨 ${esc(u)}-${esc(code)} · aina kiireellinen tehtävä</div>
       <div class="g-body">
         ${what}
         ${tier === "cd" ? `<p class="g-hint">Hälytysasteesta riippumatta tämä tehtävä hoidetaan kiireellisen mallin mukaan.</p>` : ""}
@@ -1176,11 +1176,11 @@ function guidanceHtml(code, urgency) {
         ${kh}
         ${note}
       </div>
-    </details>`;
+    </section>`;
   }
   if (tier === "ab") {
-    return `<details class="guidance g-acute" open>
-      <summary>🚨 ${esc(u)}-${esc(code)} · kiireellinen lähestyminen</summary>
+    return `<section class="guidance g-acute">
+      <div class="g-title">🚨 ${esc(u)}-${esc(code)} · kiireellinen lähestyminen</div>
       <div class="g-body">
         ${what}
         ${tierList(g.ab, "g-ab", "Painopisteet tällä keikalla")}
@@ -1192,11 +1192,11 @@ function guidanceHtml(code, urgency) {
         ${kh}
         ${note}
       </div>
-    </details>`;
+    </section>`;
   }
   if (tier === "cd") {
-    return `<details class="guidance g-stable" open>
-      <summary>🩺 ${esc(u)}-${esc(code)} · vakaa, kiireetön lähestyminen</summary>
+    return `<section class="guidance g-stable">
+      <div class="g-title">🩺 ${esc(u)}-${esc(code)} · vakaa, kiireetön lähestyminen</div>
       <div class="g-body">
         ${what}
         ${tierList(g.cd, "g-cd", "Painopisteet tällä keikalla")}
@@ -1208,11 +1208,11 @@ function guidanceHtml(code, urgency) {
         ${kh}
         ${note}
       </div>
-    </details>`;
+    </section>`;
   }
   // Ei valittua hälytysastetta → referenssinäkymä (esim. koodikirjasto)
-  return `<details class="guidance">
-    <summary>🧭 Tietoa tehtävästä & lähestyminen kiireellisyyden mukaan</summary>
+  return `<section class="guidance">
+    <div class="g-title">🧭 Tietoa tehtävästä & lähestyminen kiireellisyyden mukaan</div>
     <div class="g-body">
       ${what}
       ${g.acute ? `<p class="g-hint">Aina kiireellinen tehtävä hälytysasteesta riippumatta.</p>` : `<p class="g-hint">Valitse hälytysaste, niin näet juuri sille keikalle painottuvan ohjeen.</p>`}
@@ -1226,7 +1226,7 @@ function guidanceHtml(code, urgency) {
       ${kh}
       ${note}
     </div>
-  </details>`;
+  </section>`;
 }
 // ---------- Kaikki keikat (haku + suodatus) ----------
 let callFilter = { q: "", urgency: "", lead: "", incomplete: false };
@@ -1768,6 +1768,57 @@ const MEMORY_AIDS = [
     "T – Tamponaatio (sydän)",
     "T – Tromboosi: keuhkoembolia tai sepelvaltimotukos",
     "T – Toksiinit: myrkytys, vasta-aineet hoito-ohjeen mukaan",
+  ]},
+  { t: "HOTT – traumaattisen sydänpysähdyksen hoidettavat syyt", items: [
+    "H – Hypovolemia: vuoto kiinni (kiristysside, pakkaus, lantiovyö) ja volyymi",
+    "O – Oxygenation: ilmatie auki, 100 % happi, ventilaatio",
+    "T – Tension pneumothorax: pleuradekompressio ohjeen mukaan",
+    "T – Tamponade: lääkäriyksikkö / torakotomiaosaaminen, jos indikaatio",
+    "TCA:ssa hoidettavat syyt ennen painelua – painelu ei korjaa tyhjää sydäntä",
+    "Aktiivihoito mielekkäintä, jos viimeisistä elonmerkeistä alle ~15 min",
+  ]},
+  { t: "MARCH – taktinen ensihoito (TECC)", items: [
+    "M – Massive hemorrhage: kiristysside, haavan pakkaus, paineside",
+    "A – Airway: asento, hengitystien avaus, imu, nieluputki/SGA",
+    "R – Respiration: rintakehävamman peitto, paineilmarinnan epäily ja purku",
+    "C – Circulation: i.v./i.o., TXA ja kalsium ohjeen mukaan, neste/verituotteet",
+    "H – Hypothermia/Head: lämpötalous; aivovamman hapetus, ventilaatio ja paine",
+    "Kuuma alue: vain uhan vähennys, evakuointi ja massiivivuoto · lämmin alue: MARCH · kylmä alue: monitorointi, kipu, kuljetus",
+  ]},
+  { t: "Kuoleman timantti – vuotopotilaan kierre", items: [
+    "Hypotermia – heikentää hyytymistä → märät vaatteet pois, eristä alustasta, peittele heti, lämmitä nesteet",
+    "Asidoosi – heikentää hyytymistä ja sydämen toimintaa",
+    "Koagulopatia – lisää vuotoa (kristalloidit eivät korvaa hyytymistekijöitä)",
+    "Hypokalsemia – heikentää hyytymistä ja verenkiertoa, etenkin verituotteiden kanssa",
+    "Kaikki neljä pahentavat toisiaan – katkaise kierre heti alusta",
+  ]},
+  { t: "EKG-tulkinnan runko (sama järjestys joka kerta)", items: [
+    "1. Laatu: häiriöt, elektrodit, väärä kytkentä?",
+    "2. Taajuus: hidas – normaali – nopea",
+    "3. Säännöllisyys: säännöllinen vai epäsäännöllinen?",
+    "4. P-aallot: näkyvätkö, seuraako jokaista QRS?",
+    "5. PQ-aika: pidentynyt (yli ~210 ms = I asteen AV-katkos)?",
+    "6. QRS-leveys: kapea vai leveä (yli 120 ms = johtumishäiriö/kammioperäinen)?",
+    "7. Akseli ja kompleksien suunnat",
+    "8. ST-taso ja T-aallot: nousut, laskut, reciprokit, hyperakuutit T:t",
+    "9. QT-aika (synkope, lääkkeet, elektrolyytit, torsades-riski)",
+    "10. Vertaa vanhaan EKG:hen, jos saatavilla",
+  ]},
+  { t: "Nopea rytmiluokittelu (leveys × säännöllisyys)", items: [
+    "Kapea + epäsäännöllinen → eteisvärinä (tai flutteri vaihtelevalla johtumisella)",
+    "Kapea + säännöllinen → SVT tai eteislepatus 2:1 (~150/min – etsi sahalaitaa)",
+    "Leveä + säännöllinen → kammiotakykardia kunnes toisin osoitettu",
+    "Leveä + epäsäännöllinen → FA + haarakatkos/WPW tai polymorfinen VT – ei AV-solmukesalpaajia ilman varmuutta, konsultoi",
+    "Epävakaa (hypotensio, tajunnan lasku, iskeeminen kipu, keuhkopöhö) → sähköinen hoito",
+  ]},
+  { t: "Rintakipu – tappavat ensin", items: [
+    "Sydäninfarkti / OMI – EKG heti ja toistaen, lisäkytkennät",
+    "Aortan dissekaatio – repivä kipu, puoliero paineissa, neurologinen oire",
+    "Keuhkoembolia – pleuriittinen kipu, takykardia, hypoksia, tukosriskit",
+    "Paineilmarinta – toispuoleiset hengitysäänet, äkillinen romahdus",
+    "Tamponaatio – kapea pulssipaine, kaulalaskimopullotus, hiljaiset sydänäänet",
+    "Sepsis / vaikea pneumonia – kuume, takypnea, sekavuus",
+    "Ruokatorven repeämä – raju oksentelu ennen kipua",
   ]},
   { t: "APGAR – vastasyntyneen arvio (1 ja 5 min)", items: [
     "A – Appearance: ihon väri (sininen/kalpea 0 · raajat siniset 1 · kauttaaltaan punakka 2)",
