@@ -1780,6 +1780,17 @@ const MEMORY_AIDS = [
     "T – Tromboosi: keuhkoembolia tai sepelvaltimotukos",
     "T – Toksiinit: myrkytys, vasta-aineet hoito-ohjeen mukaan",
   ]},
+  { t: "Elvytyslääkkeet ja antoajat (aikuinen, ERC)", items: [
+    "Adrenaliini 1 mg i.v./i.o. – ei-iskettävässä (asystolia/PEA) heti kun suoniyhteys, iskettävässä (VF/pVT) 3. defibrillaation jälkeen; toistetaan 3–5 min välein (joka toisen 2 min jakson alussa)",
+    "Amiodaroni 300 mg i.v./i.o. VF/pVT:ssä 3. iskun jälkeen; lisäannos 150 mg 5. iskun jälkeen",
+    "Lidokaiini 100 mg i.v. vaihtoehtona jos amiodaronia ei saatavilla (lisäannos 50 mg) – ei sekaisin amiodaronin kanssa",
+    "Magnesiumsulfaatti 2 g i.v. torsades de pointes -rytmissä, voidaan toistaa",
+    "Kalsium vain: hyperkalemia, hypokalsemia, kalsiuminestäjämyrkytys",
+    "Natriumbikarbonaatti vain: hyperkalemia tai trisyklinen yliannos",
+    "Liuotus vain vahvassa KE-epäilyssä → elvytystä jatketaan 60–90 min",
+    "Hypotermia: < 30 °C ei lääkkeitä · 30–35 °C adrenaliiniväli 6–10 min",
+    "Lapsi: adrenaliini 0,01 mg/kg 3–5 min välein · amiodaroni 5 mg/kg 3. ja 5. iskun jälkeen",
+  ]},
   { t: "HOTT – traumaattisen sydänpysähdyksen hoidettavat syyt", items: [
     "H – Hypovolemia: vuoto kiinni (kiristysside, pakkaus, lantiovyö) ja volyymi",
     "O – Oxygenation: ilmatie auki, 100 % happi, ventilaatio",

@@ -19,6 +19,25 @@
 //   actions = hoidon linjat
 //   red     = hälytysmerkit
 
+// Elvytyslääkkeet ja antoajat (aikuinen; ERC 2021 / Käypä hoito Elvytys).
+// Jaettu lohko koodeille 700 ja 701.
+const ELVYTYS_LAAKKEET = {
+  t: "💉 Elvytyslääkkeet ja antoajat (aikuinen)",
+  items: [
+    "Adrenaliini 1 mg i.v./i.o. – EI-ISKETTÄVÄSSÄ rytmissä (asystolia/PEA) heti, kun suoniyhteys on avattu; ISKETTÄVÄSSÄ rytmissä (VF/pVT) kolmannen defibrillaation jälkeen. Toistetaan 3–5 minuutin välein eli käytännössä joka toisen 2 minuutin painelujakson alussa",
+    "Amiodaroni 300 mg i.v./i.o. VF/pVT:ssä kolmannen defibrillaation jälkeen; lisäannos 150 mg viidennen defibrillaation jälkeen",
+    "Lidokaiini 100 mg i.v. (1–1,5 mg/kg) vaihtoehtona, jos amiodaronia ei ole saatavilla; lisäannos 50 mg – ei käytetä sekaisin amiodaronin kanssa",
+    "Magnesiumsulfaatti 2 g i.v. kääntyvien kärkien kammiotakykardiassa (torsades de pointes); voidaan toistaa kerran",
+    "Kalsium vain erityistilanteissa: hyperkalemia, hypokalsemia tai kalsiuminestäjämyrkytys – ei rutiinikäyttöä elvytyksessä",
+    "Natriumbikarbonaatti ei kuulu rutiiniin: harkitaan hyperkalemiassa tai trisyklisen masennuslääkkeen yliannostuksessa hoito-ohjeen mukaan",
+    "Liuotushoito elvytyksen aikana vain vahvassa keuhkoemboliaepäilyssä – annon jälkeen elvytystä jatketaan 60–90 minuuttia",
+    "Nestebolus kristalloidilla hypovolemiaepäilyssä; TCA:ssa verituotteet alueohjeen mukaan",
+    "Hypotermia: ydinlämpö alle 30 °C → elvytyslääkkeitä ei anneta; 30–35 °C → adrenaliinin antoväli pidennetään 6–10 minuuttiin",
+    "Lapsi: adrenaliini 0,01 mg/kg (10 µg/kg) i.v./i.o. 3–5 min välein; amiodaroni 5 mg/kg kolmannen ja viidennen defibrillaation jälkeen",
+    "Opioidiyliannoksen elottomuudessa naloksoni ei korvaa elvytystä – ventilaatio ja painelu edellä, naloksoni hoito-ohjeen mukaan",
+  ],
+};
+
 export const CODE_INFO = {
   // ---------- Peruselintoiminnan häiriö ----------
   "700": {
@@ -38,6 +57,7 @@ export const CODE_INFO = {
     ],
     assess: ["Reagoimattomuus ja normaalin hengityksen puuttuminen; agonaalihengitys = eloton", "Alkurytmi monitorista: iskettävä (VF/pVT) vai ei-iskettävä (PEA/asystolia) – kirjaa", "Kapnografia (EtCO₂): ventilaation ja painelun laadun mittari; äkillinen nousu → tarkista ROSC"],
     actions: ["Laadukas painelu (100–120/min, 5–6 cm), tauot alle 5 s", "Defibrilloi VF/pVT viiveettä, jatka 2 min jaksoissa rytmintarkistuksin", "Ilmatien varmistus (supraglottinen väline tai intubaatio) ja kapnografia; ventilaatio 10/min ilman hyperventilaatiota", "Suoniyhteys tai i.o. – adrenaliini 1 mg i.v./i.o. 3–5 min välein; VF/pVT:ssä amiodaroni 300 mg kolmannen defibrillaation jälkeen (hoito-ohjeen mukaan)", "Käy läpi palautuvat syyt 4H + 4T ja hoida löydetty syy", "TRAUMAATTINEN sydänpysähdys (TCA) ei ole tavallinen ALS-elvytys: hoidettavat syyt edellä (HOTT: Hypovolemia – vuoto kiinni ja volyymi · Oxygenation – ilmatie ja 100 % happi · Tension – pleuradekompressio ohjeen mukaan · Tamponade – lääkäriyksikkö). Painelu resurssien mukaan, mutta se ei korjaa tyhjää sydäntä. Aktiivihoito mielekkäintä, jos viimeisistä elonmerkeistä alle ~15 min", "Raskaana (puolivälin jälkeen): normaali elvytysprotokolla ja energiat + kohdun manuaalinen siirto vasemmalle (laskimopaluu), varhainen ilmatien varmistus (nopea desaturaatio); konsultoi varhain – hätäsektio voi olla äidin ja sikiön selviytymisen kannalta ratkaiseva"],
+    steps: [ELVYTYS_LAAKKEET],
     red: ["Iskettävä rytmi → defibrillointi ilman viivettä", "EtCO₂:n äkillinen nousu → ROSC-tarkistus", "Epäselvä tilanne → elvytä, älä viivyttele"],
   },
   "701": {
@@ -49,6 +69,7 @@ export const CODE_INFO = {
     ],
     assess: ["Rytmin tunnistus ja tarkistus 2 min välein", "Painelun laatu ja keskeytysten minimointi (vaihda painelijaa)", "ROSC-merkit: EtCO₂-nousu, pulssi, potilaan herääminen"],
     actions: ["Rytmipohjainen protokolla: painelu–defibrillointi–ilmatie–lääkkeet hoito-ohjeen mukaan", "Kapnografia koko elvytyksen ajan: intubaation varmistus, painelun laatu, ROSC", "Palautuvat syyt 4H + 4T: Hypoksia, Hypovolemia, Hypo-/hyperkalemia (metaboliset), Hypotermia · Tensiopneumotoraksi, Tamponaatio, Tromboosi (sydän/keuhko), Toksiinit", "ROSC: tavoitteellinen hapetus (SpO₂ 94–98 %) ja normoventilaatio, verenpaineen tuki, 12-EKG, ennakkoilmoitus"],
+    steps: [ELVYTYS_LAAKKEET],
     red: ["ROSC: vältä yli- ja alihapetusta, seuraa rytmiä ja painetta", "Hypotermisen elvytys on pitkä – ei kuollut ennen kuin lämmin ja kuollut"],
   },
   "702": {
