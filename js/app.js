@@ -1141,8 +1141,12 @@ function guidanceHtml(code, urgency) {
   const tier = (u === "A" || u === "B") ? "ab" : (u === "C" || u === "D") ? "cd" : null;
   const list = (arr) => `<ul class="g-list">${arr.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`;
   const what = info?.what ? `<p class="g-what">${esc(info.what)}</p>` : "";
-  // Aikatavoitteet: mitä pitäisi olla tehtynä mihinkin mennessä (yleiset opetustavoitteet)
-  const timeGoals = info?.time?.length ? `<div class="g-time"><span class="g-time-lab">⏱ Aikatavoitteet</span>${info.time.map((t) => `<span class="g-time-item">${esc(t)}</span>`).join("")}</div>` : "";
+  // Aikatavoitteet: mikä pitää olla suoritettuna mihinkin aikamääreeseen mennessä
+  // (muoto "aikamääre – suoritettu asia"; aikamääre lihavoidaan)
+  const timeGoals = info?.time?.length ? `<div class="g-sec g-time"><h4>⏱ Aikatavoitteet – mitä on suoritettuna</h4><ul class="g-list g-timelist">${info.time.map((x) => {
+    const i = x.indexOf(" – ");
+    return i > 0 ? `<li><b>${esc(x.slice(0, i))}</b> – ${esc(x.slice(i + 3))}</li>` : `<li>${esc(x)}</li>`;
+  }).join("")}</ul></div>` : "";
   // Haastattelu / selvitettävät asiat: kysymys + lyhyt perustelu (miksi kysytään)
   const ask = info?.ask?.length ? `<div class="g-sec g-ask"><h4>🗣️ Haastattele ja selvitä</h4><ul class="g-list g-asklist">${info.ask.map((x) => {
     const i = x.indexOf(" – ");
