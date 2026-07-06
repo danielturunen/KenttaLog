@@ -1141,12 +1141,13 @@ function guidanceHtml(code, urgency) {
   const tier = (u === "A" || u === "B") ? "ab" : (u === "C" || u === "D") ? "cd" : null;
   const list = (arr) => `<ul class="g-list">${arr.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`;
   const what = info?.what ? `<p class="g-what">${esc(info.what)}</p>` : "";
-  // Aikatavoitteet: mikä pitää olla suoritettuna mihinkin aikamääreeseen mennessä
-  // (muoto "aikamääre – suoritettu asia"; aikamääre lihavoidaan)
-  const timeGoals = info?.time?.length ? `<div class="g-sec g-time"><h4>⏱ Aikatavoitteet – mitä on suoritettuna</h4><ul class="g-list g-timelist">${info.time.map((x) => {
-    const i = x.indexOf(" – ");
-    return i > 0 ? `<li><b>${esc(x.slice(0, i))}</b> – ${esc(x.slice(i + 3))}</li>` : `<li>${esc(x)}</li>`;
-  }).join("")}</ul></div>` : "";
+  // Aikatavoitteet omana osionaan: aikamääre vasemmassa sarakkeessa ja
+  // täysi kuvaus suoritettavasta asiasta oikealla ({ t, d } -muoto).
+  const timeGoals = info?.time?.length ? `<div class="g-sec g-time"><h4>⏱ Aikatavoitteet – mitä on suoritettuna mihinkin mennessä</h4><div class="tg-rows">${info.time.map((x) => {
+    const t = typeof x === "string" ? x.split(" – ")[0] : x.t;
+    const d = typeof x === "string" ? x.slice(t.length + 3) : x.d;
+    return `<div class="tg-row"><span class="tg-time">${esc(t)}</span><span class="tg-desc">${esc(d)}</span></div>`;
+  }).join("")}</div></div>` : "";
   // Haastattelu / selvitettävät asiat: kysymys + lyhyt perustelu (miksi kysytään)
   const ask = info?.ask?.length ? `<div class="g-sec g-ask"><h4>🗣️ Haastattele ja selvitä</h4><ul class="g-list g-asklist">${info.ask.map((x) => {
     const i = x.indexOf(" – ");
