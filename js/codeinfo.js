@@ -37,7 +37,7 @@ export const CODE_INFO = {
       "Hoitolinjaus (DNR) tiedossa? – vaikuttaa elvytyspäätökseen, varmista lähteestä",
     ],
     assess: ["Reagoimattomuus ja normaalin hengityksen puuttuminen; agonaalihengitys = eloton", "Alkurytmi monitorista: iskettävä (VF/pVT) vai ei-iskettävä (PEA/asystolia) – kirjaa", "Kapnografia (EtCO₂): ventilaation ja painelun laadun mittari; äkillinen nousu → tarkista ROSC"],
-    actions: ["Laadukas painelu (100–120/min, 5–6 cm), tauot alle 5 s", "Defibrilloi VF/pVT viiveettä, jatka 2 min jaksoissa rytmintarkistuksin", "Ilmatien varmistus (supraglottinen väline tai intubaatio) ja kapnografia; ventilaatio 10/min ilman hyperventilaatiota", "Suoniyhteys tai i.o. – adrenaliini ja amiodaroni hoito-ohjeen rytmityksellä", "Käy läpi palautuvat syyt 4H + 4T ja hoida löydetty syy", "TRAUMAATTINEN sydänpysähdys (TCA) ei ole tavallinen ALS-elvytys: hoidettavat syyt edellä (HOTT: Hypovolemia – vuoto kiinni ja volyymi · Oxygenation – ilmatie ja 100 % happi · Tension – pleuradekompressio ohjeen mukaan · Tamponade – lääkäriyksikkö). Painelu resurssien mukaan, mutta se ei korjaa tyhjää sydäntä. Aktiivihoito mielekkäintä, jos viimeisistä elonmerkeistä alle ~15 min", "Raskaana (puolivälin jälkeen): normaali elvytysprotokolla ja energiat + kohdun manuaalinen siirto vasemmalle (laskimopaluu), varhainen ilmatien varmistus (nopea desaturaatio); konsultoi varhain – hätäsektio voi olla äidin ja sikiön selviytymisen kannalta ratkaiseva"],
+    actions: ["Laadukas painelu (100–120/min, 5–6 cm), tauot alle 5 s", "Defibrilloi VF/pVT viiveettä, jatka 2 min jaksoissa rytmintarkistuksin", "Ilmatien varmistus (supraglottinen väline tai intubaatio) ja kapnografia; ventilaatio 10/min ilman hyperventilaatiota", "Suoniyhteys tai i.o. – adrenaliini 1 mg i.v./i.o. 3–5 min välein; VF/pVT:ssä amiodaroni 300 mg kolmannen defibrillaation jälkeen (hoito-ohjeen mukaan)", "Käy läpi palautuvat syyt 4H + 4T ja hoida löydetty syy", "TRAUMAATTINEN sydänpysähdys (TCA) ei ole tavallinen ALS-elvytys: hoidettavat syyt edellä (HOTT: Hypovolemia – vuoto kiinni ja volyymi · Oxygenation – ilmatie ja 100 % happi · Tension – pleuradekompressio ohjeen mukaan · Tamponade – lääkäriyksikkö). Painelu resurssien mukaan, mutta se ei korjaa tyhjää sydäntä. Aktiivihoito mielekkäintä, jos viimeisistä elonmerkeistä alle ~15 min", "Raskaana (puolivälin jälkeen): normaali elvytysprotokolla ja energiat + kohdun manuaalinen siirto vasemmalle (laskimopaluu), varhainen ilmatien varmistus (nopea desaturaatio); konsultoi varhain – hätäsektio voi olla äidin ja sikiön selviytymisen kannalta ratkaiseva"],
     red: ["Iskettävä rytmi → defibrillointi ilman viivettä", "EtCO₂:n äkillinen nousu → ROSC-tarkistus", "Epäselvä tilanne → elvytä, älä viivyttele"],
   },
   "701": {
@@ -189,7 +189,7 @@ export const CODE_INFO = {
       "Laitesukellus ja nopea pintaan nousu? – sukeltajantaudin mahdollisuus, konsultoi ylipainehappihoidosta",
     ],
     assess: ["Hengitys ja happeutuminen", "Ydinlämpö (hypotermia)", "Rankavamma vain jos mekanismi sopii – ei rutiinituentaa"],
-    actions: ["Eloton: aloita 5 alkupuhalluksella ennen painelua (hypoksinen elottomuus), muuten elvytys tavalliseen tapaan", "Ilmatie tyhjennetään vedestä ja eritteistä valuttamalla/imulla; hapetus ja ventilaatio etusijalla", "CPAP/NIV varoen: mahassa on yleensä vettä ja oksentamisherkkyys suuri", "Estä jäähtyminen, riisu märät vaatteet", "Kylmästä vedestä pelastettu eloton → harkitse kuljetusta elvyttäen ECMO-valmiuteen (yliopistosairaala), ennakkoilmoitus", "Kuljeta seurantaan myös vähäoireinen ja nopeasti toipunut – keuhkopöhö voi kehittyä tuntien viiveellä"],
+    actions: ["Eloton: aloita 5 alkupuhalluksella ennen painelua (hypoksinen elottomuus), muuten elvytys tavalliseen tapaan", "Ilmatie tyhjennetään vedestä ja eritteistä valuttamalla/imulla; hapetus ja ventilaatio etusijalla", "CPAP/NIV varoen: mahassa on yleensä vettä ja oksentamisherkkyys suuri", "Estä jäähtyminen, riisu märät vaatteet", "Kylmästä vedestä pelastettu eloton → harkitse kuljetusta elvyttäen ECMO-valmiuteen (yliopistosairaala), ennakkoilmoitus; ROSC:n jälkeen hypotensiossa (SAP < 100) noradrenaliini-infuusio ja hypertensiossa labetaloli 10–20 mg i.v. toistaen hoito-ohjeen mukaan, pahoinvointiin ondansetroni 4 mg i.v.", "Kuljeta seurantaan myös vähäoireinen ja nopeasti toipunut – keuhkopöhö voi kehittyä tuntien viiveellä"],
     red: ["Hypotermia + eloton → elvytä, lämmitä ('ei kuollut ennen kuin lämmin ja kuollut')", "Hyväkuntoisenkin hengitysoireet voivat alkaa viiveellä → matala kuljetuskynnys"],
   },
   // ---------- Vamma ----------
@@ -209,7 +209,7 @@ export const CODE_INFO = {
       "Verenohennuslääkitys? – sisäisen vuodon ja aivovamman riski kasvaa",
     ],
     assess: ["Vammamekanismi ja putoamiskorkeus; 5 sekunnin yleissilmäys ovelta (tajunta, hengitys, massiivivuoto, ihon väri)", "Blood sweep: kädet potilaan ympärille ja alle – kainalot, nivuset, kaula, selkä, pakarat ja alusta", "cABCDE, rangan ja lantion arvio; sokki-indeksi > 1 (syke > systolinen RR) = vuotosokin merkki", "Rangan tuennan tarve (NEXUS-tyyppiset kriteerit): keskilinjan aristus, neurologinen puutos, alentunut tajunta, päihtymys tai kivulias muu vamma → tue", "Tajunta ja raajojen liike/tunto"],
-    actions: ["Hallitse henkeä uhkaava vuoto ensin (paine → painepakkaus → kiristysside)", "Lantiovyö, jos mekanismi tai löydös viittaa lantionmurtumaan", "Tue ranka ja immobilisoi kriteerien täyttyessä – tuenta ei saa viivyttää henkeä pelastavaa hoitoa", "Suoniyhteys ja kivunhoito hoito-ohjeen mukaan; lämpötalous heti alusta (hypotermia pahentaa hyytymishäiriötä)", "Aivovammaepäilyssä: estä hypoksia ja hypotensio, pää neutraaliasentoon, GCS ja pupillit toistuvasti", "Estä jäähtyminen, nopea kuljetus traumayksikköön ('load and go' epävakaalla) ja varhainen ennakkoilmoitus"],
+    actions: ["Hallitse henkeä uhkaava vuoto ensin (paine → painepakkaus → kiristysside)", "Lantiovyö, jos mekanismi tai löydös viittaa lantionmurtumaan", "Tue ranka ja immobilisoi kriteerien täyttyessä – tuenta ei saa viivyttää henkeä pelastavaa hoitoa", "Suoniyhteys; kivunhoito jos VAS > 4: fentanyyli 50–150 µg i.v. tai 100–200 µg i.n. jaettuna sieraimiin, oksikodoni tai morfiini 2–4 mg i.v. toistaen, hypotensiiviselle esketamiini 12,5 mg i.v. konsultaatiolla (yli 70-vuotiaalle pienemmät annokset); TXA 1 g i.v. runsaan vuodon epäilyssä; lämpötalous heti alusta", "Aivovammaepäilyssä: estä hypoksia ja hypotensio, pää neutraaliasentoon, GCS ja pupillit toistuvasti", "Estä jäähtyminen, nopea kuljetus traumayksikköön ('load and go' epävakaalla) ja varhainen ennakkoilmoitus"],
     red: ["Korkea energia, lantio-/reisivamma, neurologinen puutos", "Sokki-indeksi > 1, kalpea ja kylmänhikinen → sisäinen vuoto kunnes toisin osoitettu"],
   },
   "744": {
@@ -246,7 +246,7 @@ export const CODE_INFO = {
       "Aiemmat kaatumiset ja kotona pärjääminen? – kokonaisarvio ja jatkosuunnitelma",
     ],
     assess: ["Kaatumisen syy (mekaaninen vai sairauskohtaus)", "Vammat: lonkka, ranne, pää", "Ortostatismi, rytmi, verensokeri syyn arviossa", "Aivovammapotilaan tavoitteet: SpO₂ > 94 %, SAP > 120 mmHg, normoventilaatio (EtCO₂ ~4–4,5 kPa), normoglykemia", "Aivovamma EI lähtökohtaisesti selitä hypotensiota – matala paine → etsi vuotoa muualta"],
-    actions: ["Tutki vammat ja syy, kivunhoito hoito-ohjeen mukaan", "Aivovammaepäilyssä kuljetus pääpuoli 20–30° koholla, pää suorassa, kaulalaskimot vapaina (ei kiristävää tuentaa/kiinnitystä – kova kauluri varoen, tuenta mieluummin käsin/tyhjiöpatjalla)", "Arvioi kuljetus ja kotipärjääminen", "Kotiseuranta pään vammassa vain jos: ei tajuttomuutta tai muistiaukkoa, ei neurologisia oireita, ei oksentelua/kovaa päänsärkyä, ei antikoagulaatiota JA seuranta kotona on mahdollista + kirjalliset ohjeet"],
+    actions: ["Tutki vammat ja syy, kivunhoito hoito-ohjeen mukaan", "Aivovammaepäilyssä kuljetus pääpuoli 20–30° koholla, pää suorassa, kaulalaskimot vapaina (kova kauluri varoen, tuenta mieluummin käsin/tyhjiöpatjalla); paineen tuki: kristalloidi 300–500 ml ja tarvittaessa noradrenaliini-infuusio hoito-ohjeen mukaan (SAP > 120); TXA 1 g i.v. vaikeassa aivovammassa vain ensihoitolääkärin konsultaatiolla", "Arvioi kuljetus ja kotipärjääminen", "Kotiseuranta pään vammassa vain jos: ei tajuttomuutta tai muistiaukkoa, ei neurologisia oireita, ei oksentelua/kovaa päänsärkyä, ei antikoagulaatiota JA seuranta kotona on mahdollista + kirjalliset ohjeet"],
     red: ["Pään vamma + verenohennuslääkitys", "Taustalla pyörtyminen/rytmihäiriö", "GCS laskee ≥ 2 pistettä, toistuva oksentelu tai kouristus → kiireellinen kuljetus, lääkäriyksikkö"],
   },
   "746": {
@@ -340,7 +340,7 @@ export const CODE_INFO = {
       "Räjähdys mukana? – paineaaltovammat",
     ],
     assess: ["Laajuus 9 %:n säännöllä (aikuinen: pää 9, yläraaja 9, alaraaja 18, vartalon etu/taka 18+18, genitaalit 1); potilaan kämmen sormineen ≈ 1 %", "LAAJA palovamma: aikuisella > 20 %, lapsella > 10 % kehon pinta-alasta", "Syvyys: pinnallinen (punoitus, kipu) vs. syvä (vaalea/hiiltynyt, tunnoton); kovettunut liekkipalovamma on aina syvä", "Hengitystiepalovamman merkit: kasvojen/kaulan syvä vamma, käheys, stridor, noki limakalvoilla, turvotus"],
-    actions: ["Pieniä vamma-alueita voi jäähdyttää haalealla vedellä – LAAJOJA EI jäähdytetä hypotermiariskin vuoksi; estä jäähtyminen aktiivisesti", "Hapetus (laajassa 100 % happi); hengitystie-epäilyssä varaudu varhaiseen ilmatien varmistukseen – turvotus pahenee nopeasti", "Suljetun tilan palo + tajunnan lasku/hypotensio/kouristelu → epäile häkä- JA syanidimyrkytystä (muovi, tekstiilit); SpO₂ voi näyttää virheellisen hyvää – antidootti ja ylipainehappi konsultaation mukaan", "Suoniyhteys, nestehoito laajassa vammassa ja kivunhoito (usein i.v.-opioidi) hoito-ohjeen mukaan; kuuman veden aiheuttamassa nestehoitoa harvoin tarvitaan kentällä", "Peitä puhtain taitoksin / tarttumattomalla kalvolla", "Laaja/syvä vamma, hengitystie-epäily tai nivel-/genitaalialueen vamma → palovammakeskuksen konsultaatio"],
+    actions: ["Pieniä vamma-alueita voi jäähdyttää haalealla vedellä – LAAJOJA EI jäähdytetä hypotermiariskin vuoksi; estä jäähtyminen aktiivisesti", "Hapetus (laajassa 100 % happi); hengitystie-epäilyssä varaudu varhaiseen ilmatien varmistukseen – turvotus pahenee nopeasti", "Suljetun tilan palo + tajunnan lasku/hypotensio/kouristelu → epäile häkä- JA syanidimyrkytystä (muovi, tekstiilit); SpO₂ voi näyttää virheellisen hyvää – hydroksokobalamiini 5 g i.v. syanidiepäilyssä ja ylipainehappi konsultaation mukaan", "Suoniyhteys ja nestehoito laajassa vammassa: aikuiselle 1000 ml/t, lapselle 20 ml/kg/t kristalloidia kunnes tarkempi annostelu on mahdollista (kuuman veden vammassa nestehoitoa ei yleensä tarvita kentällä); nesteelle reagoimattomassa hypotensiossa noradrenaliini-infuusio hoito-ohjeen mukaan", "Peitä puhtain taitoksin / tarttumattomalla kalvolla", "Laaja/syvä vamma, hengitystie-epäily tai nivel-/genitaalialueen vamma → palovammakeskuksen konsultaatio"],
     red: ["Hengitystiepalovamma, laaja palovamma, suljettu tila", "Sähköpalovamma suurjännitteestä: pienet ulkoiset löydökset eivät poissulje isoja sisäisiä vaurioita"],
   },
   "755": {
@@ -358,7 +358,7 @@ export const CODE_INFO = {
       "Lääkitys: diureetit, psyykenlääkkeet, antikolinergit? – heikentävät lämmönsäätelyä",
     ],
     assess: ["Ydinlämpö, tajunta ja iho", "Nestehukan merkit", "Erota: saunassa pyörtyminen normaalilla ydinlämmöllä ≠ lämpöhalvaus – jälkimmäinen vaatii aina kuljetuksen"],
-    actions: ["Lopeta lämpöaltistus heti, viilennä aktiivisesti (viileä vesi, pyyhkeet) kunnes ydinlämpö lähestyy normaalia", "Nesteytys viileillä nesteillä hoito-ohjeen mukaan, verenkiertoa seuraten", "Korjaa matala verensokeri; saunatilanteessa huomioi mahdollinen hengitystiepalovamma"],
+    actions: ["Lopeta lämpöaltistus heti, viilennä aktiivisesti (viileä vesi, pyyhkeet) kunnes ydinlämpö lähestyy normaalia", "Nesteytys viileillä kristalloideilla: aluksi nopeasti 300–500 ml (lapselle 10 ml/kg), toistetaan verenkierron vasteen mukaan", "Korjaa matala verensokeri; saunatilanteessa huomioi mahdollinen hengitystiepalovamma"],
     red: ["Tajunnan häiriö + korkea lämpö → lämpöhalvaus, hätätilanne"],
   },
   "756": {
@@ -396,7 +396,7 @@ export const CODE_INFO = {
       "Musta, tervamainen uloste? – merkki ylemmästä GI-vuodosta",
     ],
     assess: ["Vuodon lähteen päättely: kirkas verioksennus → ruokatorvi · kahvinporomainen tai kirkas → maha/pohjukaissuoli · pelkkä melena (musta uloste) → ylempi suolisto · kirkas veri peräsuolesta → alempi suolisto", "Verioksentelu + samanaikainen melena = runsas vuoto", "Hemodynamiikka ja sokin merkit: rannesyke ei tunnu, viileä iho, tajunnan lasku", "Veriaspiraation riski tajunnanhäiriöisellä"],
-    actions: ["Ilmatien turvaaminen, asentohoito", "Kaksi suoniyhteyttä; sokissa nopeat nestebolukset tavoitteeseen (rannesyke tuntuu / tajunta kohenee) hoito-ohjeen mukaan – vältä ylinesteytystä", "Traneksaamihappo runsaassa vuodossa hoito-ohjeen mukaan; verituotteet alueellisen ohjeen mukaan", "Estä jäähtyminen; nopea kuljetus (tähystystarve) ja ennakkoilmoitus"],
+    actions: ["Ilmatien turvaaminen, asentohoito", "Kaksi suoniyhteyttä; sokissa nopea 250 ml kristalloidibolus 3–5 minuutissa toistaen tavoitteeseen (SAP > 100 mmHg, rannesyke tuntuu, tajunta kohenee) – vältä ylinesteytystä", "Traneksaamihappo 1 g i.v. aikuiselle (lapselle 20 mg/kg) runsaassa vuodossa; verituotteet alueohjeen mukaan (esim. O-neg punasoluja 2–4 yksikköä ja/tai kuivaplasmaa 200–400 ml, erityisesti hyytymisongelmassa)", "Estä jäähtyminen; nopea kuljetus (tähystystarve) ja ennakkoilmoitus"],
     red: ["Runsas tuore veri + matala paine → henkeä uhkaava", "Maksasairaus/alkoholi + verioksennus → laskimolaajentumavuoto, romahtaa nopeasti"],
   },
   "762": {
@@ -470,7 +470,7 @@ export const CODE_INFO = {
       "Aiemmat vakavat hypoglykemiat? Tunteeko hypon tulon? – hypotuntemusten puute = riskipotilas",
     ],
     assess: ["Verensokeri, tajunta ja nielemiskyky", "Ketoasidoosin merkit korkeassa sokerissa"],
-    actions: ["Matala sokeri: nopea hiilihydraatti suun kautta jos nielee turvallisesti; muuten i.v.-glukoosi tai glukagoni i.m. hoito-ohjeen mukaan", "Korjauksen jälkeen pitkävaikutteinen hiilihydraatti ja kontrollimittaus – hypo voi uusia (etenkin alkoholi, pitkävaikutteinen insuliini)", "Korkea sokeri + huono vointi: nesteytys ja kuljetus hoito-ohjeen mukaan (ketoasidoosiepäily aina kuljetus)"],
+    actions: ["Matala sokeri: nopea hiilihydraatti suun kautta jos nielee turvallisesti; muuten G10-glukoosia i.v. (esim. 100–200 ml toistaen kunnes P-gluk > 4 mmol/l) tai glukagoni 1 mg i.m. hoito-ohjeen mukaan", "Korjauksen jälkeen pitkävaikutteinen hiilihydraatti ja kontrollimittaus – hypo voi uusia (etenkin alkoholi, pitkävaikutteinen insuliini)", "Korkea sokeri + huono vointi: nesteytys ja kuljetus hoito-ohjeen mukaan (ketoasidoosiepäily aina kuljetus)"],
     red: ["Tajuttomuus, ketoasidoosin merkit (Kussmaul-hengitys, asetonin haju)"],
   },
   "772": {
@@ -488,7 +488,7 @@ export const CODE_INFO = {
       "Löikö päänsä? Raskaus? – vamma; raskaana eklampsia on suljettava pois",
     ],
     assess: ["Kohtauksen kesto ja toistuvuus", "Verensokeri, lämpö, vammat", "Tajunnan palautuminen (jälkitila)"],
-    actions: ["Suojaa potilas, turvaa ilmatie kohtauksen jälkeen", "Pitkittynyt kohtaus → lääkitys hoito-ohjeen mukaan viiveettä (bentsodiatsepiini; ilman suoniyhteyttä bukkaalinen/nasaalinen)", "Raskaana olevan kouristelu = eklampsia kunnes toisin osoitettu: vasen kylkiasento, rauhallinen ympäristö (vältä kirkkaita valoja); magnesium on ensisijainen lääke hoito-ohjeen/konsultaation mukaan – ennakkoilmoitus"],
+    actions: ["Suojaa potilas, turvaa ilmatie kohtauksen jälkeen", "Pitkittynyt kohtaus → bentsodiatsepiini viiveettä hoito-ohjeen mukaan: esim. midatsolaami 10 mg bukkaalisesti (ilman suoniyhteyttä) tai 2,5–5 mg i.v. toistaen; vaihtoehtona loratsepaami 0,1 mg/kg, enintään 4 mg", "Raskaana olevan kouristelu = eklampsia kunnes toisin osoitettu: vasen kylkiasento, rauhallinen ympäristö (vältä kirkkaita valoja); magnesium on ensisijainen lääke hoito-ohjeen/konsultaation mukaan – ennakkoilmoitus"],
     red: ["Kohtaus > 5 min tai toistuva ilman toipumista = status epilepticus"],
   },
   "773": {
@@ -507,7 +507,7 @@ export const CODE_INFO = {
       "Astma perussairautena? – ennustaa vaikeampaa kulkua",
     ],
     assess: ["A/B/C-ongelma (hengitys, verenkierto) ± iho-/limakalvo-oireet", "Muista: anafylaksia voi esiintyä ilman iho-oireita"],
-    actions: ["Anafylaksia: i.m. adrenaliini reisilihakseen viiveettä hoito-ohjeen mukaan, toista tarvittaessa", "Poista altiste, asento (hengitys istuen, verenkierto makuulla), happi", "Tukihoito: nesteytys ja muut lääkkeet hoito-ohjeen mukaan"],
+    actions: ["Anafylaksia: adrenaliini aikuiselle 0,5 mg i.m. reisilihakseen viiveettä (lapselle 0,01 mg/kg i.m.), toista tarvittaessa; vaihtoehtona 0,05–0,1 mg i.v. toistaen tai infuusio hoito-ohjeen mukaan", "Poista altiste, asento (hengitys istuen, verenkierto makuulla), happi", "Tukihoito: nesteytys; kortikosteroidi (hydrokortisoni 250–500 mg i.v., lapsi 5 mg/kg – tai metyyliprednisoloni 125 mg, lapsi 2 mg/kg) ja antihistamiini (setiritsiini 10 mg p.o.) hoito-ohjeen mukaan"],
     red: ["Hengitysteiden turvotus, vinkuna, matala paine → välitön adrenaliini", "Kaksivaiheinen reaktio mahdollinen → riittävä seuranta"],
   },
   "774": {
@@ -627,7 +627,7 @@ export const CODE_INFO = {
     what: "Synnytys / synnytyksen käynnistyminen. Matkasynnytyksen vaiheistettu toimintaohje alla (Selvitä → Tutki → Valmistaudu → Ponnistusvaihe → Syntymän jälkeen).",
     time: [
       { t: "2 minuutissa", d: "Kouristelevan potilaan ilmatie- tai hengitysongelma on tunnistettu ja hoidettu. Potilas on vasemmassa kylkiasennossa." },
-      { t: "5 minuutissa", d: "Kouristelun lääkehoito on aloitettu. Magnesium on ensisijainen lääke hoito-ohjeen mukaan." },
+      { t: "5 minuutissa", d: "Kouristelun lääkehoito on aloitettu. Magnesiumsulfaatti on ensisijainen lääke: esimerkiksi 5 g / 100 ml NaCl i.v. 15–20 minuutin infuusiona hoito-ohjeen mukaan. Lisänä tarvittaessa midatsolaami 10 mg bukkaalisesti tai 2,5–5 mg i.v." },
       { t: "15 minuutissa", d: "Hätäkuljetukseen synnytyssairaalaan on lähdetty." },
     ],
     // 1. SELVITÄ – haastattelu (+ neuvolakortti kun kiireellisyys arvioitu)

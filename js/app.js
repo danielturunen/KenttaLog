@@ -1160,7 +1160,7 @@ function guidanceHtml(code, urgency) {
   const actions = steps + (info?.actions?.length ? `<div class="g-sec"><h4>Hoidon linjat</h4>${list(info.actions)}</div>` : "");
   const assess = info?.assess?.length ? `<div class="g-sec"><h4>Keskeinen arvio</h4>${list(info.assess)}</div>` : "";
   const kh = KH_LINKS[code] ? `<a class="info-link g-kh" href="${KH_LINKS[code][1]}" target="_blank" rel="noopener">📖 Käypä hoito: ${esc(KH_LINKS[code][0])}</a>` : "";
-  const note = `<p class="g-note">Yleistä, itse koostettua ensihoidon tietoa (lähteinä mm. Käypä hoito -suositusten julkiset versiot, StatPearls, ERC, AHA/ASA, WHO). Noudata alueellista hoito-ohjetta – ei lääkeannoksia, ei korvaa virallista ohjetta.</p>`;
+  const note = `<p class="g-note">Yleistä, itse koostettua ensihoidon tietoa (lähteinä mm. Käypä hoito -suositusten julkiset versiot, ERC, AHA/ASA, StatPearls). Lääkeannokset ovat aikuisen esimerkkiannoksia opiskelukäyttöön – tarkista aina alueellinen hoito-ohje, joka ratkaisee.</p>`;
   const hud = hudCardsHtml(code);
   // Painotuslista näytetään vain, jos se tuo koodikohtaista lisäarvoa
   // (geneeriset perusrungot jätetään pois kun hoidon linjat + arvio kattavat sisällön).
