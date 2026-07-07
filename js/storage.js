@@ -40,6 +40,8 @@ const DEFAULT_DATA = {
     ekgCards: [],
     // Viimeisimmän varmuuskopion päivä (muistutusta varten)
     lastBackup: "",
+    // Väriteema (ks. THEMES app.js:ssä)
+    theme: "yo",
   },
 };
 
