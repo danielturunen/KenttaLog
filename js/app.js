@@ -2691,6 +2691,19 @@ function renderSettings() {
     <header class="page-head"><h1>Asetukset</h1></header>
 
     <section class="settings-block">
+      <h2>Teema</h2>
+      <p class="muted">Valitse sovelluksen väriteema. Aseman väri näkyy korostuksena kaikissa teemoissa.</p>
+      <div class="theme-grid">
+        ${THEMES.map((t) => `
+          <button type="button" class="theme-card ${(st.theme || "yo") === t.id ? "on" : ""}" data-theme="${t.id}" style="--tc-bg:${t.vars["--bg"]};--tc-surface:${t.vars["--surface"]};--tc-s2:${t.vars["--surface-2"]};--tc-text:${t.vars["--text"]};--tc-border:${t.vars["--border"]}">
+            <span class="tc-prev"><span class="tc-dot d1"></span><span class="tc-dot d2"></span><span class="tc-dot d3"></span></span>
+            <span class="tc-name">${esc(t.name)}</span>
+            <span class="tc-desc">${esc(t.desc)}</span>
+          </button>`).join("")}
+      </div>
+    </section>
+
+    <section class="settings-block">
       <h2>Kuljetuskohteet</h2>
       <p class="muted">Pilkulla eroteltuna. Näkyvät keikkalomakkeen ehdotuksissa.</p>
       <textarea id="set-dest" rows="3">${esc(st.destinations.join(", "))}</textarea>
@@ -2776,6 +2789,14 @@ function renderSettings() {
       const lvl = unitLevel(unit);
       if (lvl !== null) document.getElementById("set-defht").value = lvl ? "1" : "0";
     },
+  });
+  app.querySelectorAll(".theme-card").forEach((b) => {
+    b.onclick = () => {
+      updateSettings({ theme: b.dataset.theme });
+      applyTheme(b.dataset.theme);
+      app.querySelectorAll(".theme-card").forEach((x) => x.classList.toggle("on", x === b));
+      toast("Teema vaihdettu");
+    };
   });
   document.getElementById("saveSettings").onclick = () => {
     updateSettings({
@@ -2946,6 +2967,28 @@ function toast(msg, opts = {}) {
   setTimeout(() => { t.classList.remove("show"); setTimeout(() => t.remove(), 300); }, ms);
 }
 
+// ---------- Väriteemat ----------
+// Käyttäjän valittava perusteema; aseman väri (--primary) säilyy aksenttina.
+const THEMES = [
+  { id: "yo", name: "Yövuoro", desc: "Tumma perusteema", scheme: "dark",
+    vars: { "--bg": "#0a0e13", "--surface": "#141a22", "--surface-2": "#1b232d", "--elevated": "#202a35", "--text": "#eef2f6", "--muted": "#93a0ad", "--border": "#29333f" } },
+  { id: "paiva", name: "Päivävuoro", desc: "Vaalea ja kliininen", scheme: "light",
+    vars: { "--bg": "#eef1f5", "--surface": "#ffffff", "--surface-2": "#e5eaf0", "--elevated": "#ffffff", "--text": "#16202b", "--muted": "#5b6875", "--border": "#cfd7e0" } },
+  { id: "monitori", name: "Monitori", desc: "Defibrillaattorin näyttö: musta ja vihertävä", scheme: "dark",
+    vars: { "--bg": "#000502", "--surface": "#071108", "--surface-2": "#0d1c0f", "--elevated": "#122616", "--text": "#dcffe4", "--muted": "#6fa87b", "--border": "#1d3a24" } },
+  { id: "hamara", name: "Aamuhämärä", desc: "Yövuoron viimeiset tunnit: indigo", scheme: "dark",
+    vars: { "--bg": "#0d0a1c", "--surface": "#171233", "--surface-2": "#1f1842", "--elevated": "#262050", "--text": "#efeaff", "--muted": "#9d93c6", "--border": "#332a5e" } },
+  { id: "hiillos", name: "Hiillos", desc: "Lämmin tumma, savusukellusta myöten", scheme: "dark",
+    vars: { "--bg": "#140b07", "--surface": "#1f130c", "--surface-2": "#291a11", "--elevated": "#332015", "--text": "#ffefe2", "--muted": "#b79a89", "--border": "#412c1e" } },
+  { id: "lomake", name: "Kenttälomake", desc: "Lämmin paperinvaalea", scheme: "light",
+    vars: { "--bg": "#f3ecdd", "--surface": "#fffdf6", "--surface-2": "#ebe2cf", "--elevated": "#fffdf6", "--text": "#2a241a", "--muted": "#6f6654", "--border": "#d9cdb4" } },
+];
+function applyTheme(id) {
+  const t = THEMES.find((x) => x.id === id) || THEMES[0];
+  for (const [k, v] of Object.entries(t.vars)) document.documentElement.style.setProperty(k, v);
+  document.documentElement.style.colorScheme = t.scheme;
+}
+
 // ---------- Asemateema ----------
 function setAccentColor(color) {
   document.documentElement.style.setProperty("--primary", color);
@@ -2977,6 +3020,7 @@ function updateStationChip(station) {
 }
 
 // ---------- Käynnistys ----------
+applyTheme(getSettings().theme);
 applyAccent();
 window.addEventListener("hashchange", route);
 route();
