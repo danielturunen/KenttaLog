@@ -438,7 +438,12 @@ a { color: inherit; text-decoration: none; }
 .modal-body { padding: 19px; overflow-y: auto; }
 .modal-body label { display: block; font-weight: 700; font-size: .9rem; margin-bottom: 13px; }
 .modal-body label input, .modal-body label select, .modal-body label textarea { margin-top: 6px; font-weight: 400; }
-.modal input[type="time"], .modal input[type="date"] { text-align: left; min-height: 46px; font-variant-numeric: tabular-nums; }
+input[type="time"], input[type="date"] {
+  text-align: left; min-height: 46px; font-variant-numeric: tabular-nums;
+  -webkit-appearance: none; appearance: none;
+}
+/* iOS tasaa natiivin date-kentän sisällön oikealle; pakota vasemmalle. */
+input[type="date"]::-webkit-date-and-time-value { text-align: left; }
 .row { display: flex; gap: 12px; }
 .row label { flex: 1; min-width: 0; }
 .hint { font-size: .82rem; color: var(--muted); margin-top: 4px; min-height: 1.2em; }
