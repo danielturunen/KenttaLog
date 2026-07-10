@@ -11,6 +11,9 @@ import { ekgWaveSvg } from "./ekgwave.js";
 import { STATIONS, stationLabel, ALL_UNITS, findStation, stationColor, DEFAULT_ACCENT, unitLevel } from "./stations.js";
 
 // ---------- Lista + oma syöte -valitsimet (asema / yksikkö) ----------
+// Sovelluksen versio – pidä samana kuin sw.js:n välimuistiversio.
+const APP_VERSION = "v59";
+
 const CUSTOM = "__custom__";
 
 function stationComboHtml(id, value) {
@@ -662,6 +665,9 @@ function vitalsLine(v) {
   if (v.hr) parts.push(`P ${esc(v.hr)}`);
   if (v.spo2) parts.push(`SpO₂ ${esc(v.spo2)}`);
   if (v.gcs) parts.push(`GCS ${esc(v.gcs)}`);
+  if (v.ht) parts.push(`HT ${esc(v.ht)}`);
+  if (v.gluk) parts.push(`Gluk ${esc(v.gluk)}`);
+  if (v.temp) parts.push(`T ${esc(v.temp)}°`);
   return parts.length ? `<div class="vitals-line">${parts.join(" · ")}</div>` : "";
 }
 
@@ -712,7 +718,7 @@ function renderShiftSummary(id) {
         <tbody>
           ${calls.length ? calls.map((c) => {
             const v = c.vitals;
-            const vs = v ? [v.rr && "RR " + v.rr, v.hr && "P " + v.hr, v.spo2 && "SpO₂ " + v.spo2, v.gcs && "GCS " + v.gcs].filter(Boolean).join(", ") : "";
+            const vs = v ? [v.rr && "RR " + v.rr, v.hr && "P " + v.hr, v.spo2 && "SpO₂ " + v.spo2, v.gcs && "GCS " + v.gcs, v.ht && "HT " + v.ht, v.gluk && "Gluk " + v.gluk, v.temp && "T " + v.temp].filter(Boolean).join(", ") : "";
             const destLabel = c.destination ? (c.tehoModule ? `${c.destination} (${c.tehoModule})` : c.destination) : "";
             let disp = c.disposition ? [dispositionShort(c), destLabel].filter(Boolean).join(": ") : "Kesken";
             if (c.disposition === "Kuljetettu" && c.transportCode) {
@@ -826,6 +832,9 @@ function openCallForm(shiftId, existing) {
         <span><small>Pulssi</small><input type="text" id="v-hr" inputmode="numeric" value="${esc(c.vitals?.hr || "")}" placeholder="72"></span>
         <span><small>SpO₂</small><input type="text" id="v-spo2" inputmode="numeric" value="${esc(c.vitals?.spo2 || "")}" placeholder="98%"></span>
         <span><small>GCS</small><input type="text" id="v-gcs" inputmode="numeric" value="${esc(c.vitals?.gcs || "")}" placeholder="15"></span>
+        <span><small>HT</small><input type="text" id="v-ht" inputmode="numeric" value="${esc(c.vitals?.ht || "")}" placeholder="16"></span>
+        <span><small>B-gluk</small><input type="text" id="v-gluk" inputmode="decimal" value="${esc(c.vitals?.gluk || "")}" placeholder="5.6"></span>
+        <span><small>Lämpö</small><input type="text" id="v-temp" inputmode="decimal" value="${esc(c.vitals?.temp || "")}" placeholder="36.8"></span>
       </div>
     </label>
     <label>Reflektio – mitä opin
@@ -842,7 +851,7 @@ function openCallForm(shiftId, existing) {
       const urgency = document.querySelector("#c-urg .on")?.dataset.u || "";
       const chipTags = [...document.querySelectorAll("#c-tags .chip.on")].map((b) => b.dataset.tag);
       const extraTags = splitList(val("c-tagextra"));
-      const vitals = { rr: val("v-rr"), hr: val("v-hr"), spo2: val("v-spo2"), gcs: val("v-gcs") };
+      const vitals = { rr: val("v-rr"), hr: val("v-hr"), spo2: val("v-spo2"), gcs: val("v-gcs"), ht: val("v-ht"), gluk: val("v-gluk"), temp: val("v-temp") };
       const hasVitals = Object.values(vitals).some((v) => v.trim());
       const disposition = val("c-disp");
       const transported = disposition === "Kuljetettu";
@@ -2008,7 +2017,11 @@ function renderTools() {
     <section class="settings-block">
       <h2>Muistilistat</h2>
       <p class="muted">Yleiset kliiniset muistikehykset nopeaan kertaukseen. Avaa kortti nähdäksesi myös visuaalisen version.</p>
-      ${MEMORY_AIDS.map((m) => `<details class="aid"><summary>${esc(m.t)}</summary><ul>${m.items.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>${m.img ? `<img class="aid-img" src="${esc(m.img)}" alt="${esc(m.t)}" loading="lazy">` : ""}</details>`).join("")}
+      <input type="search" id="aid-q" class="search" placeholder="Hae muistilistaa, esim. VOI IHME, adrenaliini, APGAR…">
+      <div id="aid-list">
+        ${MEMORY_AIDS.map((m) => `<details class="aid" data-hay="${esc((m.t + " " + m.items.join(" ")).toLowerCase())}"><summary>${esc(m.t)}</summary><ul>${m.items.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>${m.img ? `<img class="aid-img" src="${esc(m.img)}" alt="${esc(m.t)}" loading="lazy">` : ""}</details>`).join("")}
+        <p class="muted center" id="aid-empty" style="display:none">Ei osumia.</p>
+      </div>
     </section>
 
     <section class="settings-block">
@@ -2122,6 +2135,19 @@ function renderTools() {
   `;
   setupCalculators();
   startQuiz();
+  // Muistilistojen haku: suodata otsikon ja sisällön mukaan, avaa osumat
+  const aidQ = document.getElementById("aid-q");
+  aidQ.oninput = debounce(() => {
+    const q = aidQ.value.trim().toLowerCase();
+    let hits = 0;
+    document.querySelectorAll("#aid-list .aid").forEach((d) => {
+      const hit = !q || d.dataset.hay.includes(q);
+      d.style.display = hit ? "" : "none";
+      if (hit) hits++;
+      d.open = !!q && hit;
+    });
+    document.getElementById("aid-empty").style.display = hits ? "none" : "";
+  }, 150);
 }
 
 function setupCalculators() {
@@ -2779,6 +2805,7 @@ function renderSettings() {
     </section>
 
     <p class="footnote">🔒 Tietosuoja: KenttäLog on henkilökohtainen oppimispäiväkirja. Älä koskaan kirjaa potilaan tunnistetietoja. Tiedot eivät poistu laitteeltasi.</p>
+    <p class="footnote muted">KenttäLog ${APP_VERSION}</p>
   `;
   // Asema↔yksikkö-valitsin + teemavärin esikatselu aseman vaihtuessa
   wireStationUnit("set-defstation", "set-defunit", {
