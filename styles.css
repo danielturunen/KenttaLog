@@ -445,7 +445,10 @@ input[type="time"], input[type="date"] {
 /* iOS tasaa natiivin date-kentän sisällön oikealle; pakota vasemmalle. */
 input[type="date"]::-webkit-date-and-time-value { text-align: left; }
 .row { display: flex; gap: 12px; }
-.row label { flex: 1; min-width: 0; }
+/* Sarakkeet tasautuvat alareunasta, vaikka jokin otsikko rivittyisi
+   kahdelle riville (esim. "Pitoisuus (mg/ml)" annoslaskurissa). */
+.row label { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.row label > input, .row label > select, .row label > .seg { margin-top: auto; }
 .hint { font-size: .82rem; color: var(--muted); margin-top: 4px; min-height: 1.2em; }
 .lead-tag { display: inline-block; font-size: .72rem; font-weight: 700; color: #fff; background: var(--lc); padding: 1px 8px; border-radius: 999px; }
 .modal-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 15px 19px; border-top: 1px solid var(--border); }
