@@ -1307,16 +1307,37 @@ function renderCalls() {
 
 // ---------- Tilastot ----------
 let statsActivityMode = "day"; // "day" | "week"
+let statsPeriod = null; // null = koko jakso, tai "YYYY-MM"
+function statsMonths() {
+  // Kaikki kuukaudet joilta on vuoroja, uusin ensin.
+  const set = new Set();
+  for (const sh of getShifts()) if (sh.date) set.add(sh.date.slice(0, 7));
+  return [...set].sort().reverse();
+}
+function monthLabel(ym) {
+  const names = ["tammi", "helmi", "maalis", "huhti", "touko", "kesä", "heinä", "elo", "syys", "loka", "marras", "joulu"];
+  const [y, m] = ym.split("-");
+  return `${names[+m - 1]}kuu ${y}`;
+}
 function renderStats() {
-  const s = computeStats();
+  const months = statsMonths();
+  if (statsPeriod && !months.includes(statsPeriod)) statsPeriod = null;
+  const s = computeStats(statsPeriod);
+  const periodBar = months.length ? `
+    <div class="period-bar">
+      <button type="button" class="period-chip ${statsPeriod === null ? "on" : ""}" data-p="">Koko jakso</button>
+      ${months.map((m) => `<button type="button" class="period-chip ${statsPeriod === m ? "on" : ""}" data-p="${m}">${monthLabel(m)}</button>`).join("")}
+    </div>` : "";
   if (s.callCount === 0) {
     app.innerHTML = `
       <header class="page-head"><h1>Tilastot</h1></header>
+      ${periodBar}
       <div class="empty">
         <div class="empty-icon">📊</div>
-        <h2>Ei vielä dataa</h2>
-        <p>Kirjaa vuoroja ja keikkoja, niin tilastot kertyvät tähän automaattisesti.</p>
+        <h2>${statsPeriod ? "Ei keikkoja tältä kuukaudelta" : "Ei vielä dataa"}</h2>
+        <p>${statsPeriod ? "Valitse toinen kuukausi tai koko jakso." : "Kirjaa vuoroja ja keikkoja, niin tilastot kertyvät tähän automaattisesti."}</p>
       </div>`;
+    wireStatsPeriod();
     return;
   }
   const urgSegments = ["A", "B", "C", "D"].map((k) => ({ label: k, value: s.byUrgency[k] || 0, color: URGENCY[k].color }));
@@ -1324,6 +1345,8 @@ function renderStats() {
 
   app.innerHTML = `
     <header class="page-head"><h1>Tilastot</h1></header>
+    ${periodBar}
+    ${statsPeriod ? `<p class="muted period-note">Näytetään: <b>${monthLabel(statsPeriod)}</b></p>` : ""}
 
     <div class="kpis kpis-4">
       ${kpi(s.shiftCount, "vuoroa")}
@@ -1413,6 +1436,12 @@ function renderStats() {
   const toggle = document.getElementById("act-toggle");
   if (toggle) toggle.querySelectorAll("button").forEach((b) => {
     b.onclick = () => { statsActivityMode = b.dataset.m; renderStats(); };
+  });
+  wireStatsPeriod();
+}
+function wireStatsPeriod() {
+  app.querySelectorAll(".period-chip").forEach((b) => {
+    b.onclick = () => { statsPeriod = b.dataset.p || null; renderStats(); };
   });
 }
 
