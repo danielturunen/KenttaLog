@@ -479,6 +479,13 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; }
 }
 .fab:active { transform: scale(.93); }
 
+/* ---------- Kuukausivalitsin (tilastot) ---------- */
+.period-bar { display: flex; gap: 7px; overflow-x: auto; padding: 2px 0 8px; margin-bottom: 6px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.period-bar::-webkit-scrollbar { display: none; }
+.period-chip { flex: none; border: 1px solid var(--border); background: var(--surface); color: var(--muted); padding: 8px 14px; border-radius: 999px; font-weight: 700; font-size: .85rem; cursor: pointer; white-space: nowrap; transition: background .12s, color .12s, border-color .12s; }
+.period-chip.on { background: color-mix(in srgb, var(--primary) 22%, var(--surface)); color: color-mix(in srgb, var(--primary) 80%, #fff); border-color: var(--primary); }
+.period-note { margin: -2px 0 10px; }
+
 /* ---------- Filter chip & role ---------- */
 .filter-chip { border: 1px solid var(--border); background: var(--surface); color: var(--muted); padding: 11px 14px; border-radius: var(--radius-sm); font-weight: 700; font-size: .9rem; cursor: pointer; }
 .filter-chip.on { background: color-mix(in srgb, #f5b301 22%, var(--surface)); color: #ffd874; border-color: color-mix(in srgb, #f5b301 40%, var(--border)); }
