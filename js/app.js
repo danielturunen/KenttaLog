@@ -1307,35 +1307,47 @@ function renderCalls() {
 
 // ---------- Tilastot ----------
 let statsActivityMode = "day"; // "day" | "week"
-let statsPeriod = null; // null = koko jakso, tai "YYYY-MM"
-function statsMonths() {
-  // Kaikki kuukaudet joilta on vuoroja, uusin ensin.
+// Tilastojen kausivalinta: gran = "all" | "week" | "day"; value = valittu viikko/päivä.
+let statsGran = "all";
+let statsValue = null;
+function statsWeeks() {
   const set = new Set();
-  for (const sh of getShifts()) if (sh.date) set.add(sh.date.slice(0, 7));
+  for (const sh of getShifts()) if (sh.date) set.add(isoWeekOf(sh.date));
   return [...set].sort().reverse();
 }
-function monthLabel(ym) {
-  const names = ["tammi", "helmi", "maalis", "huhti", "touko", "kesä", "heinä", "elo", "syys", "loka", "marras", "joulu"];
-  const [y, m] = ym.split("-");
-  return `${names[+m - 1]}kuu ${y}`;
+function statsDays() {
+  const set = new Set();
+  for (const sh of getShifts()) if (sh.date) set.add(sh.date);
+  return [...set].sort().reverse();
+}
+function dayLabel(iso) {
+  const d = new Date(iso + "T00:00:00");
+  const days = ["su", "ma", "ti", "ke", "to", "pe", "la"];
+  return `${days[d.getDay()]} ${d.getDate()}.${d.getMonth() + 1}.`;
+}
+function weekChipLabel(wk) {
+  const m = wk.match(/W(\d+)$/);
+  return m ? `vk ${+m[1]}` : wk;
+}
+function statsFilterFn() {
+  if (statsGran === "week" && statsValue) return (date) => isoWeekOf(date) === statsValue;
+  if (statsGran === "day" && statsValue) return (date) => date === statsValue;
+  return null;
 }
 function renderStats() {
-  const months = statsMonths();
-  if (statsPeriod && !months.includes(statsPeriod)) statsPeriod = null;
-  const s = computeStats(statsPeriod);
-  const periodBar = months.length ? `
-    <div class="period-bar">
-      <button type="button" class="period-chip ${statsPeriod === null ? "on" : ""}" data-p="">Koko jakso</button>
-      ${months.map((m) => `<button type="button" class="period-chip ${statsPeriod === m ? "on" : ""}" data-p="${m}">${monthLabel(m)}</button>`).join("")}
-    </div>` : "";
+  // Varmista että valittu arvo on yhä olemassa
+  if (statsGran === "week" && statsValue && !statsWeeks().includes(statsValue)) statsValue = statsWeeks()[0] || null;
+  if (statsGran === "day" && statsValue && !statsDays().includes(statsValue)) statsValue = statsDays()[0] || null;
+  const s = computeStats(statsFilterFn());
+  const periodBar = getShifts().length ? statsPeriodBarHtml() : "";
   if (s.callCount === 0) {
     app.innerHTML = `
       <header class="page-head"><h1>Tilastot</h1></header>
       ${periodBar}
       <div class="empty">
         <div class="empty-icon">📊</div>
-        <h2>${statsPeriod ? "Ei keikkoja tältä kuukaudelta" : "Ei vielä dataa"}</h2>
-        <p>${statsPeriod ? "Valitse toinen kuukausi tai koko jakso." : "Kirjaa vuoroja ja keikkoja, niin tilastot kertyvät tähän automaattisesti."}</p>
+        <h2>${statsGran !== "all" ? "Ei keikkoja tältä ajalta" : "Ei vielä dataa"}</h2>
+        <p>${statsGran !== "all" ? "Valitse toinen viikko/päivä tai koko jakso." : "Kirjaa vuoroja ja keikkoja, niin tilastot kertyvät tähän automaattisesti."}</p>
       </div>`;
     wireStatsPeriod();
     return;
@@ -1346,7 +1358,7 @@ function renderStats() {
   app.innerHTML = `
     <header class="page-head"><h1>Tilastot</h1></header>
     ${periodBar}
-    ${statsPeriod ? `<p class="muted period-note">Näytetään: <b>${monthLabel(statsPeriod)}</b></p>` : ""}
+    ${statsPeriodNote()}
 
     <div class="kpis kpis-4">
       ${kpi(s.shiftCount, "vuoroa")}
@@ -1439,9 +1451,40 @@ function renderStats() {
   });
   wireStatsPeriod();
 }
+function statsPeriodBarHtml() {
+  const gran = `
+    <div class="period-bar">
+      <button type="button" class="period-chip ${statsGran === "all" ? "on" : ""}" data-g="all">Koko jakso</button>
+      <button type="button" class="period-chip ${statsGran === "week" ? "on" : ""}" data-g="week">Viikoittain</button>
+      <button type="button" class="period-chip ${statsGran === "day" ? "on" : ""}" data-g="day">Päivittäin</button>
+    </div>`;
+  let list = "";
+  if (statsGran === "week") {
+    const weeks = statsWeeks();
+    list = `<div class="period-bar sub">${weeks.map((w) => `<button type="button" class="period-chip ${statsValue === w ? "on" : ""}" data-v="${w}">${weekChipLabel(w)}</button>`).join("")}</div>`;
+  } else if (statsGran === "day") {
+    const days = statsDays();
+    list = `<div class="period-bar sub">${days.map((d) => `<button type="button" class="period-chip ${statsValue === d ? "on" : ""}" data-v="${d}">${dayLabel(d)}</button>`).join("")}</div>`;
+  }
+  return gran + list;
+}
+function statsPeriodNote() {
+  if (statsGran === "week" && statsValue) return `<p class="muted period-note">Näytetään: <b>${weekChipLabel(statsValue)}</b> · ${weekDateRange(statsValue)}</p>`;
+  if (statsGran === "day" && statsValue) return `<p class="muted period-note">Näytetään: <b>${formatDate(statsValue)}</b></p>`;
+  return "";
+}
 function wireStatsPeriod() {
-  app.querySelectorAll(".period-chip").forEach((b) => {
-    b.onclick = () => { statsPeriod = b.dataset.p || null; renderStats(); };
+  app.querySelectorAll(".period-chip[data-g]").forEach((b) => {
+    b.onclick = () => {
+      statsGran = b.dataset.g;
+      // Esivalitse uusin viikko/päivä kun granulariteetti vaihtuu
+      statsValue = statsGran === "week" ? (statsWeeks()[0] || null)
+        : statsGran === "day" ? (statsDays()[0] || null) : null;
+      renderStats();
+    };
+  });
+  app.querySelectorAll(".period-chip[data-v]").forEach((b) => {
+    b.onclick = () => { statsValue = b.dataset.v; renderStats(); };
   });
 }
 

@@ -12,11 +12,11 @@ export const DAYPARTS = [
 
 export const WEEKDAYS = ["Ma", "Ti", "Ke", "To", "Pe", "La", "Su"];
 
-// period: null = koko jakso, tai "YYYY-MM" = vain kyseinen kalenterikuukausi.
-export function computeStats(period = null) {
-  const inPeriod = (date) => !period || (date || "").slice(0, 7) === period;
-  const shifts = getShifts().filter((s) => inPeriod(s.date));
-  const calls = getAllCalls().filter((c) => inPeriod(c.shift?.date));
+// filterFn: null = koko jakso, tai (date) => boolean rajaa vuorot/keikat.
+export function computeStats(filterFn = null) {
+  const ok = (date) => !filterFn || filterFn(date || "");
+  const shifts = getShifts().filter((s) => ok(s.date));
+  const calls = getAllCalls().filter((c) => ok(c.shift?.date));
 
   const byUrgency = { A: 0, B: 0, C: 0, D: 0, "": 0 };
   const byLead = {};
