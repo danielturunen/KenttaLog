@@ -484,6 +484,8 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; }
 .period-bar::-webkit-scrollbar { display: none; }
 .period-chip { flex: none; border: 1px solid var(--border); background: var(--surface); color: var(--muted); padding: 8px 14px; border-radius: 999px; font-weight: 700; font-size: .85rem; cursor: pointer; white-space: nowrap; transition: background .12s, color .12s, border-color .12s; }
 .period-chip.on { background: color-mix(in srgb, var(--primary) 22%, var(--surface)); color: color-mix(in srgb, var(--primary) 80%, #fff); border-color: var(--primary); }
+.period-bar.sub { padding-top: 0; margin-bottom: 4px; }
+.period-bar.sub .period-chip { padding: 6px 12px; font-size: .8rem; }
 .period-note { margin: -2px 0 10px; }
 
 /* ---------- Filter chip & role ---------- */
