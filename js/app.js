@@ -118,8 +118,13 @@ function xSubOptions(disposition, selected) {
   const base = (disposition || "").split(" ")[0];
   const subs = X_SUBCODES[base];
   if (!subs) return "";
+  // Vanhat kirjaukset voivat sisältää tarkenteen, jota ei enää ole listalla
+  // (koodisto on päivittynyt) – säilytetään valinta silti näkyvissä.
+  const list = selected && !subs.some(([code]) => code === selected)
+    ? [...subs, [selected, "(poistunut tarkenne)"]]
+    : subs;
   return `<option value="">— valitse tarkenne —</option>` +
-    subs.map(([code, name]) => `<option value="${code}" ${selected === code ? "selected" : ""}>${esc(code)} ${esc(name)}</option>`).join("");
+    list.map(([code, name]) => `<option value="${code}" ${selected === code ? "selected" : ""}>${esc(code)} ${esc(name)}</option>`).join("");
 }
 
 // ---------- Lisätietolinkit (ensihoito-online.fi) ----------
