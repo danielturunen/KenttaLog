@@ -12,7 +12,7 @@ import { STATIONS, stationLabel, ALL_UNITS, findStation, stationColor, DEFAULT_A
 
 // ---------- Lista + oma syöte -valitsimet (asema / yksikkö) ----------
 // Sovelluksen versio – pidä samana kuin sw.js:n välimuistiversio.
-const APP_VERSION = "v59";
+const APP_VERSION = "v64";
 
 const CUSTOM = "__custom__";
 
@@ -2876,6 +2876,16 @@ function renderSettings() {
       <p class="form-note">Vinkki: lisää sovellus aloitusnäyttöön (Jaa → Lisää Koti-valikkoon) jokaisella laitteella, niin se toimii kuin natiivisovellus ja offline.</p>
     </section>
 
+    <section class="settings-block">
+      <h2>Sovelluksen versio</h2>
+      <p class="muted">Tällä laitteella on käytössä versio <b>${APP_VERSION}</b>. Sovellus tarjoaa päivitystä automaattisesti, mutta kotivalikkoon lisätty sovellus voi pitää vanhaa versiota muistissa pitkään – hae päivitys tällä napilla.</p>
+      <div class="btn-row">
+        <button class="btn primary" id="chkUpdate">⟳ Tarkista päivitykset</button>
+      </div>
+      <p class="form-note" id="updStatus"></p>
+      <p class="form-note muted">Päivitys ei koske kirjauksiasi: vuorot, keikat ja asetukset säilyvät.</p>
+    </section>
+
     <section class="settings-block danger-block">
       <h2>Vaara-alue</h2>
       <button class="btn danger" id="wipe">Tyhjennä kaikki tiedot</button>
@@ -2894,6 +2904,8 @@ function renderSettings() {
       if (lvl !== null) document.getElementById("set-defht").value = lvl ? "1" : "0";
     },
   });
+  document.getElementById("chkUpdate").onclick = (e) =>
+    checkForUpdate(e.currentTarget, document.getElementById("updStatus"));
   app.querySelectorAll(".theme-card").forEach((b) => {
     b.onclick = () => {
       updateSettings({ theme: b.dataset.theme });
@@ -3131,10 +3143,13 @@ route();
 
 // Service worker + päivitysbanneri: uusi versio ei enää vaadi hard-refreshiä,
 // vaan sovellus tarjoaa "Päivitä"-napin kun uusi versio on ladattu taustalla.
+// Rekisteröinti talteen, jotta asetusten "Tarkista päivitykset" pääsee siihen käsiksi.
+let swReg = null;
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const reg = await navigator.serviceWorker.register("./sw.js");
+      swReg = reg;
       const offerUpdate = (worker) => {
         showUpdateBanner(() => worker.postMessage("SKIP_WAITING"));
       };
@@ -3155,6 +3170,64 @@ if ("serviceWorker" in navigator) {
     } catch { /* offline tai estetty – sovellus toimii silti */ }
   });
 }
+// Asetuksista käynnistetty päivityshaku. Selain tarkistaa sw.js:n normaalisti vain
+// silloin tällöin, joten kotivalikkoon lisätty sovellus voi jäädä vanhaan versioon.
+async function checkForUpdate(btn, status) {
+  const say = (msg) => { if (status) status.textContent = msg; };
+  if (!("serviceWorker" in navigator)) {
+    say("Selain ei tue automaattista päivitystä. Sulje sovellus kokonaan ja avaa se uudelleen.");
+    return;
+  }
+  if (navigator.onLine === false) {
+    say("Ei verkkoyhteyttä – yritä uudelleen kun olet verkossa.");
+    return;
+  }
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Tarkistetaan…";
+  say("");
+  try {
+    const reg = swReg || (await navigator.serviceWorker.getRegistration());
+    if (!reg) {
+      say("Päivitystä ei voitu tarkistaa. Sulje sovellus ja avaa se uudelleen.");
+      return;
+    }
+    await reg.update();
+    const waiting = await waitForInstalled(reg);
+    if (waiting) {
+      btn.textContent = "Päivitetään…";
+      say("Uusi versio ladattu – sovellus käynnistyy uudelleen hetken kuluttua.");
+      // controllerchange-kuuntelija lataa sivun, kun uusi worker ottaa ohjat.
+      waiting.postMessage("SKIP_WAITING");
+      return;
+    }
+    say(`Käytössä on jo uusin versio (${APP_VERSION}).`);
+  } catch {
+    say("Päivityksen tarkistus epäonnistui. Yritä myöhemmin uudelleen.");
+  } finally {
+    if (btn.textContent !== "Päivitetään…") {
+      btn.disabled = false;
+      btn.textContent = label;
+    }
+  }
+}
+
+// reg.update() palaa jo ennen kuin uusi worker on ehtinyt asentua, joten odotetaan
+// asennuksen valmistumista (enintään 15 s) ennen kuin todetaan "ei päivitystä".
+function waitForInstalled(reg, timeoutMs = 15000) {
+  if (reg.waiting) return Promise.resolve(reg.waiting);
+  const w = reg.installing;
+  if (!w) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const done = (v) => { clearTimeout(timer); resolve(v); };
+    const timer = setTimeout(() => resolve(reg.waiting || null), timeoutMs);
+    w.addEventListener("statechange", () => {
+      if (w.state === "installed") done(reg.waiting || w);
+      else if (w.state === "redundant") done(null);
+    });
+  });
+}
+
 function showUpdateBanner(onUpdate) {
   if (document.querySelector(".update-banner")) return;
   const b = document.createElement("div");
