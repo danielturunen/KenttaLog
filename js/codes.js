@@ -280,6 +280,7 @@ export const X_SUBCODES = {
   ],
   "X-5": [
     ["X-51", "Ei tarvetta, terveydentila määritetty"],
+    ["X-52", "Etäyhteydellä tehdyn hoidontarpeen arvion perusteella ei tarvetta ensihoitoon tai hoitotoimenpiteisiin"],
   ],
   "X-6": [
     ["X-61", "Potilas kieltäytyi hoitotoimista ja kuljetuksesta"],
