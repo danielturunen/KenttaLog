@@ -12,7 +12,7 @@ import { STATIONS, stationLabel, ALL_UNITS, findStation, stationColor, DEFAULT_A
 
 // ---------- Lista + oma syöte -valitsimet (asema / yksikkö) ----------
 // Sovelluksen versio – pidä samana kuin sw.js:n välimuistiversio.
-const APP_VERSION = "v64";
+const APP_VERSION = "v65";
 
 const CUSTOM = "__custom__";
 
@@ -2961,12 +2961,60 @@ function renderSettings() {
   };
 }
 
+// ---------- Liike: jousi, momentum, reunavastus ----------
+// Ei animaatiokirjastoa: sovelluksen on toimittava offline ilman CDN:ää, ja
+// tarvittava osuus on tämän kokoinen. Parametrit Applen mallin mukaan
+// (vaimennus + vasteaika), ei massa/jäykkyys/vaimennus.
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+function spring({ from, to, velocity = 0, damping = 1, response = 0.4, onUpdate, onRest }) {
+  const k = (2 * Math.PI / response) ** 2;
+  const c = 4 * Math.PI * damping / response;
+  let x = from, v = velocity, prev = performance.now(), raf = 0, alive = true;
+  const step = (now) => {
+    let dt = Math.min((now - prev) / 1000, 0.064);
+    prev = now;
+    // Kiinteä alistep: iso dt (välilehti taustalla) hajottaisi integroinnin.
+    while (dt > 0) {
+      const h = Math.min(dt, 1 / 240);
+      v += (-k * (x - to) - c * v) * h;
+      x += v * h;
+      dt -= h;
+    }
+    if (Math.abs(x - to) < 0.3 && Math.abs(v) < 15) {
+      alive = false;
+      onUpdate(to, 0);
+      if (onRest) onRest();
+      return;
+    }
+    onUpdate(x, v);
+    raf = requestAnimationFrame(step);
+  };
+  raf = requestAnimationFrame(step);
+  return {
+    stop() { alive = false; cancelAnimationFrame(raf); },
+    get velocity() { return v; },
+    get running() { return alive; },
+  };
+}
+
+// Mihin heitto pysähtyisi, jos se saisi hidastua rauhassa (Applen projisointi).
+function projectMomentum(velocity, decelerationRate = 0.998) {
+  return (velocity / 1000) * decelerationRate / (1 - decelerationRate);
+}
+
+// Reunavastus: mitä kauemmas rajan yli vedetään, sitä vähemmän paneeli seuraa.
+function rubberband(overshoot, dimension, constant = 0.55) {
+  return (overshoot * dimension * constant) / (dimension + constant * Math.abs(overshoot));
+}
+
 // ---------- Modaali ----------
 function openModal(title, bodyHtml, { onSave, extra } = {}) {
   const wrap = document.createElement("div");
   wrap.className = "modal-wrap";
   wrap.innerHTML = `
     <div class="modal">
+      <div class="sheet-grip" aria-hidden="true"></div>
       <div class="modal-head">
         <h2>${esc(title)}</h2>
         <button class="iconbtn" id="m-close">✕</button>
@@ -2980,20 +3028,143 @@ function openModal(title, bodyHtml, { onSave, extra } = {}) {
   document.body.appendChild(wrap);
   document.body.classList.add("modal-open");
   wrap.querySelector("#m-close").onclick = closeModal;
-  wrap.onclick = (e) => { if (e.target === wrap) closeModal(); };
+  // Veto ei saa laueta taustaklikiksi sormen noustessa.
+  wrap.onclick = (e) => { if (e.target === wrap && !wrap._dragged) closeModal(); };
   wrap.querySelector("#m-save").onclick = onSave || closeModal;
   if (extra) wrap.querySelector("#m-extra").onclick = extra.action;
   wrap._onKey = (e) => { if (e.key === "Escape") closeModal(); };
   document.addEventListener("keydown", wrap._onKey);
+  wireSheet(wrap);
 }
-function closeModal() {
-  const wraps = document.querySelectorAll(".modal-wrap");
-  if (wraps.length) {
-    const w = wraps[wraps.length - 1];
-    if (w._onKey) document.removeEventListener("keydown", w._onKey);
-    w.remove();
+
+// Paneelin avaus, veto ja sulkeminen. Sama translateY koko ajan: veto jatkuu
+// siitä mihin jousi ehti, ja jousi lähtee siitä mihin sormi jäi.
+function wireSheet(wrap) {
+  const sheet = wrap.querySelector(".modal");
+  let y = 0, anim = null;
+  const height = () => sheet.getBoundingClientRect().height || window.innerHeight;
+
+  const paint = () => {
+    const h = height();
+    const p = h ? Math.min(Math.max(y / h, 0), 1) : 0;
+    sheet.style.transform = `translate3d(0, ${y}px, 0)`;
+    // Himmennys seuraa vetoa jatkuvasti; paneeli itse pysyy peittävänä.
+    wrap.style.background = `rgba(0,0,0,${(0.55 * (1 - p)).toFixed(3)})`;
+  };
+
+  // Vähennetty liike koskee sovelluksen omaa liikettä, ei käyttäjän vetoa:
+  // 1:1-seuranta on sormen liikettä, joten se jää päälle molemmissa tiloissa.
+  const reduced = reduceMotion.matches;
+  if (reduced) {
+    wrap.style.opacity = "0";
+    requestAnimationFrame(() => {
+      wrap.style.transition = "opacity .18s ease";
+      wrap.style.opacity = "1";
+    });
+    wrap._close = (done) => {
+      wrap.style.transition = "opacity .18s ease";
+      wrap.style.opacity = "0";
+      setTimeout(done, 180);
+    };
+  } else {
+    // Avaus: kriittisesti vaimennettu, ei ylitystä – avausta ei edeltänyt heitto.
+    y = height() || window.innerHeight;
+    paint();
+    anim = spring({
+      from: y, to: 0, damping: 1, response: 0.42,
+      onUpdate: (v) => { y = v; paint(); },
+      onRest: () => { anim = null; },
+    });
+
+    wrap._close = (done, v0 = 0) => {
+      // Sulkeutuminen samaa reittiä kuin avaus, ja sormen nopeus jatkuu.
+      const carried = anim && anim.running ? anim.velocity : v0;
+      if (anim) anim.stop();
+      anim = spring({
+        from: y, to: height(), velocity: carried, damping: 1, response: 0.3,
+        onUpdate: (v) => { y = v; paint(); },
+        onRest: done,
+      });
+    };
   }
-  if (!document.querySelectorAll(".modal-wrap").length) document.body.classList.remove("modal-open");
+
+  // Veto vain kun paneeli on alareunassa kiinni; työpöydällä se on keskitetty.
+  if (!window.matchMedia("(max-width: 579px)").matches) return;
+
+  let startY = 0, startVal = 0, pid = null, hist = [];
+  const onDown = (e) => {
+    if (e.button) return;
+    if (e.target.closest("button, a, input, select, textarea")) return;
+    pid = e.pointerId;
+    e.currentTarget.setPointerCapture(pid);
+    if (anim) { anim.stop(); anim = null; }   // tartutaan kesken lennon
+    startY = e.clientY;
+    startVal = y;                             // kunnioita tartuntakohtaa
+    hist = [{ y: e.clientY, t: performance.now() }];
+    wrap._dragged = false;
+    wrap.classList.add("dragging");
+  };
+  const onMove = (e) => {
+    if (e.pointerId !== pid) return;
+    const dy = e.clientY - startY;
+    if (!wrap._dragged && Math.abs(dy) < 6) return;   // pieni kynnys ennen sitoutumista
+    wrap._dragged = true;
+    hist.push({ y: e.clientY, t: performance.now() });
+    if (hist.length > 6) hist.shift();
+    const raw = startVal + dy;
+    y = raw >= 0 ? raw : -rubberband(-raw, height());  // ylöspäin vastustaa
+    paint();
+  };
+  const onUp = (e) => {
+    if (e.pointerId !== pid) return;
+    pid = null;
+    wrap.classList.remove("dragging");
+    if (!wrap._dragged) return;
+    const now = performance.now();
+    const ref = hist.find((p) => now - p.t < 120) || hist[0];
+    const vel = ref ? (e.clientY - ref.y) / Math.max((now - ref.t) / 1000, 0.001) : 0;
+    // Päätös projisoidusta pysähtymiskohdasta, ei sormen irrotuskohdasta.
+    if (y + projectMomentum(vel) > height() * 0.4) {
+      wrap._flingVelocity = vel;
+      closeModal();
+    } else if (reduced) {
+      y = 0;
+      paint();
+    } else {
+      // Takaisin paikalleen: heitto edelsi, joten pieni ylitys on luontevaa.
+      anim = spring({
+        from: y, to: 0, velocity: vel, damping: 0.86, response: 0.32,
+        onUpdate: (v) => { y = v; paint(); },
+        onRest: () => { anim = null; },
+      });
+    }
+    setTimeout(() => { wrap._dragged = false; }, 0);
+  };
+
+  for (const el of [wrap.querySelector(".sheet-grip"), wrap.querySelector(".modal-head")]) {
+    el.addEventListener("pointerdown", onDown);
+    el.addEventListener("pointermove", onMove);
+    el.addEventListener("pointerup", onUp);
+    el.addEventListener("pointercancel", onUp);
+  }
+}
+
+function closeModal() {
+  // Sulkeutuvat paneelit jäävät hetkeksi DOMiin animaation ajaksi, joten ne
+  // suodatetaan pois – muuten seuraava avaus laskisi ne mukaan.
+  const live = document.querySelectorAll(".modal-wrap:not([data-closing])");
+  if (live.length) {
+    const w = live[live.length - 1];
+    w.dataset.closing = "1";
+    w.style.pointerEvents = "none";
+    if (w._onKey) document.removeEventListener("keydown", w._onKey);
+    const done = () => w.remove();
+    if (w._close) w._close(done, w._flingVelocity || 0);
+    else done();
+  }
+  if (!document.querySelectorAll(".modal-wrap:not([data-closing])").length) {
+    document.body.classList.remove("modal-open");
+  }
 }
 
 // ---------- Apufunktiot ----------
