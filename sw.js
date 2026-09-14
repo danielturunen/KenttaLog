@@ -1,5 +1,5 @@
 // KenttäLog service worker – offline-tuki välimuistilla.
-const CACHE = "kenttalog-v66";
+const CACHE = "kenttalog-v67";
 const ASSETS = [
   "./",
   "./index.html",

@@ -12,7 +12,7 @@ import { STATIONS, stationLabel, ALL_UNITS, findStation, stationColor, DEFAULT_A
 
 // ---------- Lista + oma syöte -valitsimet (asema / yksikkö) ----------
 // Sovelluksen versio – pidä samana kuin sw.js:n välimuistiversio.
-const APP_VERSION = "v66";
+const APP_VERSION = "v67";
 
 const CUSTOM = "__custom__";
 
@@ -2972,9 +2972,11 @@ function renderSettings() {
       <p class="muted">Tällä laitteella on käytössä versio <b>${APP_VERSION}</b>. Sovellus tarjoaa päivitystä automaattisesti, mutta kotivalikkoon lisätty sovellus voi pitää vanhaa versiota muistissa pitkään – hae päivitys tällä napilla.</p>
       <div class="btn-row">
         <button class="btn primary" id="chkUpdate">⟳ Tarkista päivitykset</button>
+        <button class="btn" id="forceUpdate">⤓ Pakota uudelleenasennus</button>
       </div>
       <p class="form-note" id="updStatus"></p>
-      <p class="form-note muted">Päivitys ei koske kirjauksiasi: vuorot, keikat ja asetukset säilyvät.</p>
+      <p class="form-note muted">Pakotus on iOS:n kotivalikkosovellusta varten: se tyhjentää välimuistin ja lataa kaikki tiedostot uudelleen, kun tavallinen päivitys ei pure. Vaatii verkkoyhteyden.</p>
+      <p class="form-note muted">Kumpikaan ei koske kirjauksiisi: vuorot, keikat ja asetukset säilyvät.</p>
     </section>
 
     <section class="settings-block danger-block">
@@ -2997,6 +2999,8 @@ function renderSettings() {
   });
   document.getElementById("chkUpdate").onclick = (e) =>
     checkForUpdate(e.currentTarget, document.getElementById("updStatus"));
+  document.getElementById("forceUpdate").onclick = (e) =>
+    forceReinstall(e.currentTarget, document.getElementById("updStatus"));
   app.querySelectorAll(".theme-card").forEach((b) => {
     b.onclick = () => {
       updateSettings({ theme: b.dataset.theme });
@@ -3420,6 +3424,11 @@ function updateStationChip(station) {
 }
 
 // ---------- Käynnistys ----------
+// Pakotetun uudelleenasennuksen kertakäyttöinen parametri on tehnyt tehtävänsä
+// heti kun sivu on latautunut – siivotaan se pois osoiteriviltä.
+if (location.search.includes("reinstall=")) {
+  history.replaceState(null, "", location.pathname + location.hash);
+}
 applyTheme(getSettings().theme);
 applyAccent();
 window.addEventListener("hashchange", route);
@@ -3510,6 +3519,51 @@ function waitForInstalled(reg, timeoutMs = 15000) {
       else if (w.state === "redundant") done(null);
     });
   });
+}
+
+// Pakotettu uudelleenasennus. iOS:n kotivalikkosovellus pitää vanhaa versiota
+// sitkeästi: pelkkä registration.update() ei aina pure, koska myös selaimen oma
+// HTTP-välimuisti palauttaa vanhan sw.js:n. Tämä purkaa koko asennuksen –
+// service worker pois, välimuistit tyhjiksi – ja lataa sovelluksen uudelleen.
+// localStorageen ei kosketa, joten kirjaukset säilyvät.
+async function forceReinstall(btn, status) {
+  const say = (msg) => { if (status) status.textContent = msg; };
+  if (navigator.onLine === false) {
+    // Ilman verkkoa tyhjennetty välimuisti jättäisi sovelluksen avautumattomaksi.
+    say("Ei verkkoyhteyttä. Pakotettu uudelleenasennus lataa kaikki tiedostot uudelleen, joten se vaatii verkon.");
+    return;
+  }
+  const ok = confirm(
+    "Asennetaanko sovellus uudelleen?\n\n" +
+    "Välimuisti tyhjennetään ja kaikki tiedostot ladataan uudelleen. " +
+    "Kirjauksesi (vuorot, keikat, asetukset) säilyvät.\n\n" +
+    "Vaatii verkkoyhteyden, äläkä sulje sovellusta latauksen aikana."
+  );
+  if (!ok) return;
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Asennetaan…";
+  say("Poistetaan vanha asennus…");
+  try {
+    if ("serviceWorker" in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister()));
+    }
+    if (window.caches) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+    say("Ladataan uusin versio…");
+    // Kertakäyttöinen kyselyparametri ohittaa iOS:n oman HTTP-välimuistin,
+    // joka muuten tarjoaisi saman vanhan tiedoston uudelleen.
+    const base = location.href.split("#")[0].split("?")[0];
+    location.replace(`${base}?reinstall=${Date.now()}${location.hash}`);
+  } catch (e) {
+    console.error("Uudelleenasennus epäonnistui", e);
+    btn.disabled = false;
+    btn.textContent = label;
+    say("Uudelleenasennus epäonnistui. Sulje sovellus kokonaan ja avaa se uudelleen.");
+  }
 }
 
 function showUpdateBanner(onUpdate) {
