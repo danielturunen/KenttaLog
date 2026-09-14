@@ -12,7 +12,7 @@ import { STATIONS, stationLabel, ALL_UNITS, findStation, stationColor, DEFAULT_A
 
 // ---------- Lista + oma syöte -valitsimet (asema / yksikkö) ----------
 // Sovelluksen versio – pidä samana kuin sw.js:n välimuistiversio.
-const APP_VERSION = "v59";
+const APP_VERSION = "v67";
 
 const CUSTOM = "__custom__";
 
@@ -118,8 +118,13 @@ function xSubOptions(disposition, selected) {
   const base = (disposition || "").split(" ")[0];
   const subs = X_SUBCODES[base];
   if (!subs) return "";
+  // Vanhat kirjaukset voivat sisältää tarkenteen, jota ei enää ole listalla
+  // (koodisto on päivittynyt) – säilytetään valinta silti näkyvissä.
+  const list = selected && !subs.some(([code]) => code === selected)
+    ? [...subs, [selected, "(poistunut tarkenne)"]]
+    : subs;
   return `<option value="">— valitse tarkenne —</option>` +
-    subs.map(([code, name]) => `<option value="${code}" ${selected === code ? "selected" : ""}>${esc(code)} ${esc(name)}</option>`).join("");
+    list.map(([code, name]) => `<option value="${code}" ${selected === code ? "selected" : ""}>${esc(code)} ${esc(name)}</option>`).join("");
 }
 
 // ---------- Lisätietolinkit (ensihoito-online.fi) ----------
@@ -1299,7 +1304,7 @@ function renderCalls() {
     </div>
   `;
   const q = document.getElementById("q");
-  q.oninput = debounce(() => { callFilter.q = q.value; renderCalls(); restoreFocus("q"); }, 200);
+  q.oninput = frameThrottle(() => { callFilter.q = q.value; renderCalls(); restoreFocus("q"); });
   document.getElementById("f-urg").onchange = (e) => { callFilter.urgency = e.target.value; renderCalls(); };
   document.getElementById("f-lead").onchange = (e) => { callFilter.lead = e.target.value; renderCalls(); };
   document.getElementById("f-incomplete").onclick = () => { callFilter.incomplete = !callFilter.incomplete; renderCalls(); };
@@ -1344,11 +1349,13 @@ function renderStats() {
     app.innerHTML = `
       <header class="page-head"><h1>Tilastot</h1></header>
       ${periodBar}
+      <div class="stats-swipe"><div class="swipe-body">
       <div class="empty">
         <div class="empty-icon">📊</div>
         <h2>${statsGran !== "all" ? "Ei keikkoja tältä ajalta" : "Ei vielä dataa"}</h2>
-        <p>${statsGran !== "all" ? "Valitse toinen viikko/päivä tai koko jakso." : "Kirjaa vuoroja ja keikkoja, niin tilastot kertyvät tähän automaattisesti."}</p>
-      </div>`;
+        <p>${statsGran !== "all" ? "Valitse toinen viikko/päivä tai pyyhkäise sivuun." : "Kirjaa vuoroja ja keikkoja, niin tilastot kertyvät tähän automaattisesti."}</p>
+      </div>
+      </div></div>`;
     wireStatsPeriod();
     return;
   }
@@ -1358,6 +1365,7 @@ function renderStats() {
   app.innerHTML = `
     <header class="page-head"><h1>Tilastot</h1></header>
     ${periodBar}
+    <div class="stats-swipe"><div class="swipe-body">
     ${statsPeriodNote()}
 
     <div class="kpis kpis-4">
@@ -1443,6 +1451,7 @@ function renderStats() {
     <div class="list compact">
       ${s.topTags.length ? s.topTags.map(([t, n]) => `<div class="ranked"><span class="cname">${esc(t)}</span><span class="rcount">${n}</span></div>`).join("") : `<p class="muted">Ei merkintöjä vielä.</p>`}
     </div>
+    </div></div>
   `;
 
   const toggle = document.getElementById("act-toggle");
@@ -1486,6 +1495,92 @@ function wireStatsPeriod() {
   app.querySelectorAll(".period-chip[data-v]").forEach((b) => {
     b.onclick = () => { statsValue = b.dataset.v; renderStats(); };
   });
+  wireStatsSwipe();
+}
+
+// Mistä ja millä nopeudella seuraava jakso liukuu sisään. Asetetaan juuri
+// ennen renderStatsia, luetaan heti uuden sisällön synnyttyä.
+let statsSwipeEnter = null;
+
+// Jakson vaihto pyyhkäisemällä. Pystysuunta jää selaimen vieritykselle
+// (CSS: touch-action: pan-y), vaakasuunta on meidän. Vaakasuunnassa vierivien
+// osien päältä aloitettu veto jätetään niille.
+function wireStatsSwipe() {
+  const box = app.querySelector(".stats-swipe");
+  const body = app.querySelector(".swipe-body");
+  if (!box || !body) return;
+  const move = (v) => { body.style.transform = `translate3d(${v}px,0,0)`; };
+
+  // Sisääntulo: uusi jakso jatkaa siitä mihin naapuri oli vedetty.
+  if (statsSwipeEnter) {
+    const { from, velocity } = statsSwipeEnter;
+    statsSwipeEnter = null;
+    if (!reduceMotion.matches) {
+      move(from);
+      spring({ from, to: 0, velocity, damping: 1, response: 0.36, onUpdate: move });
+    }
+  }
+
+  const list = statsGran === "week" ? statsWeeks() : statsGran === "day" ? statsDays() : [];
+  const idx = list.indexOf(statsValue);
+  if (list.length < 2 || idx < 0) return;
+
+  const width = () => box.getBoundingClientRect().width || window.innerWidth;
+  let pid = null, x0 = 0, y0 = 0, dx = 0, axis = null, hist = [], anim = null;
+
+  box.addEventListener("pointerdown", (e) => {
+    if (e.button) return;
+    // Vaakasuunnassa vierivä sisältö saa pitää eleensä itsellään.
+    if (e.target.closest(".colchart, .hourchart, .period-bar, input, select, textarea")) return;
+    pid = e.pointerId; x0 = e.clientX; y0 = e.clientY; dx = 0; axis = null;
+    hist = [{ x: e.clientX, t: performance.now() }];
+    if (anim) { anim.stop(); anim = null; }
+  });
+
+  box.addEventListener("pointermove", (e) => {
+    if (e.pointerId !== pid) return;
+    const ddx = e.clientX - x0, ddy = e.clientY - y0;
+    if (!axis) {
+      // Kumpaa elettä ollaan tekemässä – päätetään vasta kun suunta on selvä.
+      if (Math.abs(ddx) < 10 && Math.abs(ddy) < 10) return;
+      axis = Math.abs(ddx) > Math.abs(ddy) ? "x" : "y";
+      if (axis === "x") box.setPointerCapture(pid);
+      else { pid = null; return; }
+    }
+    hist.push({ x: e.clientX, t: performance.now() });
+    if (hist.length > 6) hist.shift();
+    // Uusinta ennen ja vanhinta jälkeen ei ole mitään – reuna vastustaa.
+    const atEdge = (ddx > 0 && idx === 0) || (ddx < 0 && idx === list.length - 1);
+    dx = atEdge ? Math.sign(ddx) * rubberband(Math.abs(ddx), width()) : ddx;
+    move(dx);
+  });
+
+  const end = (e) => {
+    if (e.pointerId !== pid) return;
+    pid = null;
+    if (axis !== "x") return;
+    const now = performance.now();
+    const ref = hist.find((p) => now - p.t < 120) || hist[0];
+    const vx = ref ? (e.clientX - ref.x) / Math.max((now - ref.t) / 1000, 0.001) : 0;
+    const projected = dx + projectMomentum(vx);
+    const dir = projected < 0 ? 1 : -1;          // vasemmalle = vanhempaan päin
+    const next = idx + dir;
+    if (Math.abs(projected) > width() * 0.25 && next >= 0 && next < list.length) {
+      haptic("tap");
+      // Naapuri on levyn verran sivussa nykyisestä kohdasta – sieltä se tulee.
+      statsSwipeEnter = { from: dx + dir * width(), velocity: vx };
+      statsValue = list[next];
+      renderStats();
+      return;
+    }
+    // Ei riittänyt: takaisin paikalleen sormen nopeus mukanaan.
+    anim = spring({
+      from: dx, to: 0, velocity: vx, damping: 0.9, response: 0.3,
+      onUpdate: move, onRest: () => { anim = null; },
+    });
+  };
+  box.addEventListener("pointerup", end);
+  box.addEventListener("pointercancel", end);
 }
 
 // ---------- Saavutukset (motivoiva edistyminen, lasketaan suoraan datasta) ----------
@@ -1797,7 +1892,7 @@ function renderCodes() {
     }).join("")}
   `;
   const cq = document.getElementById("cq");
-  cq.oninput = debounce(() => { codeQuery = cq.value; renderCodes(); restoreFocus("cq"); }, 200);
+  cq.oninput = frameThrottle(() => { codeQuery = cq.value; renderCodes(); restoreFocus("cq"); });
   app.querySelectorAll("[data-code]").forEach((el) => {
     el.onclick = () => openCodeInfo(el.dataset.code);
   });
@@ -2209,7 +2304,7 @@ function renderTools() {
   startQuiz();
   // Muistilistojen haku: suodata otsikon ja sisällön mukaan, avaa osumat
   const aidQ = document.getElementById("aid-q");
-  aidQ.oninput = debounce(() => {
+  aidQ.oninput = frameThrottle(() => {
     const q = aidQ.value.trim().toLowerCase();
     let hits = 0;
     document.querySelectorAll("#aid-list .aid").forEach((d) => {
@@ -2219,7 +2314,7 @@ function renderTools() {
       d.open = !!q && hit;
     });
     document.getElementById("aid-empty").style.display = hits ? "none" : "";
-  }, 150);
+  });
 }
 
 function setupCalculators() {
@@ -2305,6 +2400,7 @@ function startQuiz() {
       quizScore.total++;
       const right = b.dataset.code === correct.code;
       if (right) quizScore.ok++;
+      haptic(right ? "ok" : "warn");
       box.querySelectorAll(".quiz-opt").forEach((x) => {
         x.disabled = true;
         if (x.dataset.code === correct.code) x.classList.add("right");
@@ -2871,6 +2967,18 @@ function renderSettings() {
       <p class="form-note">Vinkki: lisää sovellus aloitusnäyttöön (Jaa → Lisää Koti-valikkoon) jokaisella laitteella, niin se toimii kuin natiivisovellus ja offline.</p>
     </section>
 
+    <section class="settings-block">
+      <h2>Sovelluksen versio</h2>
+      <p class="muted">Tällä laitteella on käytössä versio <b>${APP_VERSION}</b>. Sovellus tarjoaa päivitystä automaattisesti, mutta kotivalikkoon lisätty sovellus voi pitää vanhaa versiota muistissa pitkään – hae päivitys tällä napilla.</p>
+      <div class="btn-row">
+        <button class="btn primary" id="chkUpdate">⟳ Tarkista päivitykset</button>
+        <button class="btn" id="forceUpdate">⤓ Pakota uudelleenasennus</button>
+      </div>
+      <p class="form-note" id="updStatus"></p>
+      <p class="form-note muted">Pakotus on iOS:n kotivalikkosovellusta varten: se tyhjentää välimuistin ja lataa kaikki tiedostot uudelleen, kun tavallinen päivitys ei pure. Vaatii verkkoyhteyden.</p>
+      <p class="form-note muted">Kumpikaan ei koske kirjauksiisi: vuorot, keikat ja asetukset säilyvät.</p>
+    </section>
+
     <section class="settings-block danger-block">
       <h2>Vaara-alue</h2>
       <button class="btn danger" id="wipe">Tyhjennä kaikki tiedot</button>
@@ -2889,6 +2997,10 @@ function renderSettings() {
       if (lvl !== null) document.getElementById("set-defht").value = lvl ? "1" : "0";
     },
   });
+  document.getElementById("chkUpdate").onclick = (e) =>
+    checkForUpdate(e.currentTarget, document.getElementById("updStatus"));
+  document.getElementById("forceUpdate").onclick = (e) =>
+    forceReinstall(e.currentTarget, document.getElementById("updStatus"));
   app.querySelectorAll(".theme-card").forEach((b) => {
     b.onclick = () => {
       updateSettings({ theme: b.dataset.theme });
@@ -2944,12 +3056,72 @@ function renderSettings() {
   };
 }
 
+// ---------- Liike: jousi, momentum, reunavastus ----------
+// Ei animaatiokirjastoa: sovelluksen on toimittava offline ilman CDN:ää, ja
+// tarvittava osuus on tämän kokoinen. Parametrit Applen mallin mukaan
+// (vaimennus + vasteaika), ei massa/jäykkyys/vaimennus.
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+function spring({ from, to, velocity = 0, damping = 1, response = 0.4, onUpdate, onRest }) {
+  const k = (2 * Math.PI / response) ** 2;
+  const c = 4 * Math.PI * damping / response;
+  let x = from, v = velocity, prev = performance.now(), raf = 0, alive = true;
+  const step = (now) => {
+    let dt = Math.min((now - prev) / 1000, 0.064);
+    prev = now;
+    // Kiinteä alistep: iso dt (välilehti taustalla) hajottaisi integroinnin.
+    while (dt > 0) {
+      const h = Math.min(dt, 1 / 240);
+      v += (-k * (x - to) - c * v) * h;
+      x += v * h;
+      dt -= h;
+    }
+    if (Math.abs(x - to) < 0.3 && Math.abs(v) < 15) {
+      alive = false;
+      onUpdate(to, 0);
+      if (onRest) onRest();
+      return;
+    }
+    onUpdate(x, v);
+    raf = requestAnimationFrame(step);
+  };
+  raf = requestAnimationFrame(step);
+  return {
+    stop() { alive = false; cancelAnimationFrame(raf); },
+    get velocity() { return v; },
+    get running() { return alive; },
+  };
+}
+
+// Mihin heitto pysähtyisi, jos se saisi hidastua rauhassa (Applen projisointi).
+function projectMomentum(velocity, decelerationRate = 0.998) {
+  return (velocity / 1000) * decelerationRate / (1 - decelerationRate);
+}
+
+// Reunavastus: mitä kauemmas rajan yli vedetään, sitä vähemmän paneeli seuraa.
+function rubberband(overshoot, dimension, constant = 0.55) {
+  return (overshoot * dimension * constant) / (dimension + constant * Math.abs(overshoot));
+}
+
+// Haptinen palaute. Vain merkityksellisiin hetkiin: kun jokin loksahtaa
+// paikalleen, onnistuu tai menee pieleen. Jos jokainen painallus värisisi,
+// käyttäjä oppisi sivuuttamaan koko palautteen. Kutsutaan samassa framessa
+// visuaalisen muutoksen kanssa – muuten aistit eivät osu yhteen.
+// iOS-Safari ei tue Vibration APIa, joten tämä on hiljainen lisä, ei perusta.
+const HAPTICS = { tap: 10, ok: [11, 45, 20], warn: [28, 55, 28] };
+function haptic(kind) {
+  const pattern = HAPTICS[kind];
+  if (!pattern || reduceMotion.matches) return;
+  try { navigator.vibrate && navigator.vibrate(pattern); } catch { /* estetty tai ei tuettu */ }
+}
+
 // ---------- Modaali ----------
 function openModal(title, bodyHtml, { onSave, extra } = {}) {
   const wrap = document.createElement("div");
   wrap.className = "modal-wrap";
   wrap.innerHTML = `
     <div class="modal">
+      <div class="sheet-grip" aria-hidden="true"></div>
       <div class="modal-head">
         <h2>${esc(title)}</h2>
         <button class="iconbtn" id="m-close">✕</button>
@@ -2963,20 +3135,144 @@ function openModal(title, bodyHtml, { onSave, extra } = {}) {
   document.body.appendChild(wrap);
   document.body.classList.add("modal-open");
   wrap.querySelector("#m-close").onclick = closeModal;
-  wrap.onclick = (e) => { if (e.target === wrap) closeModal(); };
+  // Veto ei saa laueta taustaklikiksi sormen noustessa.
+  wrap.onclick = (e) => { if (e.target === wrap && !wrap._dragged) closeModal(); };
   wrap.querySelector("#m-save").onclick = onSave || closeModal;
   if (extra) wrap.querySelector("#m-extra").onclick = extra.action;
   wrap._onKey = (e) => { if (e.key === "Escape") closeModal(); };
   document.addEventListener("keydown", wrap._onKey);
+  wireSheet(wrap);
 }
-function closeModal() {
-  const wraps = document.querySelectorAll(".modal-wrap");
-  if (wraps.length) {
-    const w = wraps[wraps.length - 1];
-    if (w._onKey) document.removeEventListener("keydown", w._onKey);
-    w.remove();
+
+// Paneelin avaus, veto ja sulkeminen. Sama translateY koko ajan: veto jatkuu
+// siitä mihin jousi ehti, ja jousi lähtee siitä mihin sormi jäi.
+function wireSheet(wrap) {
+  const sheet = wrap.querySelector(".modal");
+  let y = 0, anim = null;
+  const height = () => sheet.getBoundingClientRect().height || window.innerHeight;
+
+  const paint = () => {
+    const h = height();
+    const p = h ? Math.min(Math.max(y / h, 0), 1) : 0;
+    sheet.style.transform = `translate3d(0, ${y}px, 0)`;
+    // Himmennys seuraa vetoa jatkuvasti; paneeli itse pysyy peittävänä.
+    wrap.style.background = `rgba(0,0,0,${(0.55 * (1 - p)).toFixed(3)})`;
+  };
+
+  // Vähennetty liike koskee sovelluksen omaa liikettä, ei käyttäjän vetoa:
+  // 1:1-seuranta on sormen liikettä, joten se jää päälle molemmissa tiloissa.
+  const reduced = reduceMotion.matches;
+  if (reduced) {
+    wrap.style.opacity = "0";
+    requestAnimationFrame(() => {
+      wrap.style.transition = "opacity .18s ease";
+      wrap.style.opacity = "1";
+    });
+    wrap._close = (done) => {
+      wrap.style.transition = "opacity .18s ease";
+      wrap.style.opacity = "0";
+      setTimeout(done, 180);
+    };
+  } else {
+    // Avaus: kriittisesti vaimennettu, ei ylitystä – avausta ei edeltänyt heitto.
+    y = height() || window.innerHeight;
+    paint();
+    anim = spring({
+      from: y, to: 0, damping: 1, response: 0.42,
+      onUpdate: (v) => { y = v; paint(); },
+      onRest: () => { anim = null; },
+    });
+
+    wrap._close = (done, v0 = 0) => {
+      // Sulkeutuminen samaa reittiä kuin avaus, ja sormen nopeus jatkuu.
+      const carried = anim && anim.running ? anim.velocity : v0;
+      if (anim) anim.stop();
+      anim = spring({
+        from: y, to: height(), velocity: carried, damping: 1, response: 0.3,
+        onUpdate: (v) => { y = v; paint(); },
+        onRest: done,
+      });
+    };
   }
-  if (!document.querySelectorAll(".modal-wrap").length) document.body.classList.remove("modal-open");
+
+  // Veto vain kun paneeli on alareunassa kiinni; työpöydällä se on keskitetty.
+  if (!window.matchMedia("(max-width: 579px)").matches) return;
+
+  let startY = 0, startVal = 0, pid = null, hist = [];
+  const onDown = (e) => {
+    if (e.button) return;
+    if (e.target.closest("button, a, input, select, textarea")) return;
+    pid = e.pointerId;
+    e.currentTarget.setPointerCapture(pid);
+    if (anim) { anim.stop(); anim = null; }   // tartutaan kesken lennon
+    startY = e.clientY;
+    startVal = y;                             // kunnioita tartuntakohtaa
+    hist = [{ y: e.clientY, t: performance.now() }];
+    wrap._dragged = false;
+    wrap.classList.add("dragging");
+  };
+  const onMove = (e) => {
+    if (e.pointerId !== pid) return;
+    const dy = e.clientY - startY;
+    if (!wrap._dragged && Math.abs(dy) < 6) return;   // pieni kynnys ennen sitoutumista
+    wrap._dragged = true;
+    hist.push({ y: e.clientY, t: performance.now() });
+    if (hist.length > 6) hist.shift();
+    const raw = startVal + dy;
+    y = raw >= 0 ? raw : -rubberband(-raw, height());  // ylöspäin vastustaa
+    paint();
+  };
+  const onUp = (e) => {
+    if (e.pointerId !== pid) return;
+    pid = null;
+    wrap.classList.remove("dragging");
+    if (!wrap._dragged) return;
+    const now = performance.now();
+    const ref = hist.find((p) => now - p.t < 120) || hist[0];
+    const vel = ref ? (e.clientY - ref.y) / Math.max((now - ref.t) / 1000, 0.001) : 0;
+    // Päätös projisoidusta pysähtymiskohdasta, ei sormen irrotuskohdasta.
+    if (y + projectMomentum(vel) > height() * 0.4) {
+      wrap._flingVelocity = vel;
+      haptic("tap");            // paneeli irtoaa – sama frame kuin päätös
+      closeModal();
+    } else if (reduced) {
+      y = 0;
+      paint();
+    } else {
+      // Takaisin paikalleen: heitto edelsi, joten pieni ylitys on luontevaa.
+      anim = spring({
+        from: y, to: 0, velocity: vel, damping: 0.86, response: 0.32,
+        onUpdate: (v) => { y = v; paint(); },
+        onRest: () => { anim = null; },
+      });
+    }
+    setTimeout(() => { wrap._dragged = false; }, 0);
+  };
+
+  for (const el of [wrap.querySelector(".sheet-grip"), wrap.querySelector(".modal-head")]) {
+    el.addEventListener("pointerdown", onDown);
+    el.addEventListener("pointermove", onMove);
+    el.addEventListener("pointerup", onUp);
+    el.addEventListener("pointercancel", onUp);
+  }
+}
+
+function closeModal() {
+  // Sulkeutuvat paneelit jäävät hetkeksi DOMiin animaation ajaksi, joten ne
+  // suodatetaan pois – muuten seuraava avaus laskisi ne mukaan.
+  const live = document.querySelectorAll(".modal-wrap:not([data-closing])");
+  if (live.length) {
+    const w = live[live.length - 1];
+    w.dataset.closing = "1";
+    w.style.pointerEvents = "none";
+    if (w._onKey) document.removeEventListener("keydown", w._onKey);
+    const done = () => w.remove();
+    if (w._close) w._close(done, w._flingVelocity || 0);
+    else done();
+  }
+  if (!document.querySelectorAll(".modal-wrap:not([data-closing])").length) {
+    document.body.classList.remove("modal-open");
+  }
 }
 
 // ---------- Apufunktiot ----------
@@ -3010,9 +3306,16 @@ function formatDateLong(iso) {
   const days = ["Sunnuntai", "Maanantai", "Tiistai", "Keskiviikko", "Torstai", "Perjantai", "Lauantai"];
   return `${days[d.getDay()]} ${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
 }
-function debounce(fn, ms) {
-  let t;
-  return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+// Hakukenttien suodatus tapahtuu paikallisesti muistissa – verkkoa ei odoteta,
+// joten viive on pelkkää viivettä. Ajetaan ruudunpiirron tahdissa: tulos näkyy
+// heti seuraavassa framessa, mutta nopea kirjoitus ei piirrä montaa kertaa
+// samaan frameen.
+function frameThrottle(fn) {
+  let raf = 0;
+  return (...a) => {
+    if (raf) return;
+    raf = requestAnimationFrame(() => { raf = 0; fn(...a); });
+  };
 }
 function restoreFocus(id) {
   const el = document.getElementById(id);
@@ -3061,7 +3364,9 @@ function toast(msg, opts = {}) {
     t.textContent = msg;
   }
   document.body.appendChild(t);
-  setTimeout(() => t.classList.add("show"), 10);
+  // Kaksi framea: ensimmäinen vahvistaa alkutilan, toinen käynnistää siirtymän.
+  // Kiinteä 10 ms oli arvaus siitä, milloin selain on ehtinyt – tämä tietää sen.
+  requestAnimationFrame(() => requestAnimationFrame(() => t.classList.add("show")));
   const ms = opts.ms || 2000;
   setTimeout(() => { t.classList.remove("show"); setTimeout(() => t.remove(), 300); }, ms);
 }
@@ -3119,6 +3424,11 @@ function updateStationChip(station) {
 }
 
 // ---------- Käynnistys ----------
+// Pakotetun uudelleenasennuksen kertakäyttöinen parametri on tehnyt tehtävänsä
+// heti kun sivu on latautunut – siivotaan se pois osoiteriviltä.
+if (location.search.includes("reinstall=")) {
+  history.replaceState(null, "", location.pathname + location.hash);
+}
 applyTheme(getSettings().theme);
 applyAccent();
 window.addEventListener("hashchange", route);
@@ -3126,10 +3436,13 @@ route();
 
 // Service worker + päivitysbanneri: uusi versio ei enää vaadi hard-refreshiä,
 // vaan sovellus tarjoaa "Päivitä"-napin kun uusi versio on ladattu taustalla.
+// Rekisteröinti talteen, jotta asetusten "Tarkista päivitykset" pääsee siihen käsiksi.
+let swReg = null;
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const reg = await navigator.serviceWorker.register("./sw.js");
+      swReg = reg;
       const offerUpdate = (worker) => {
         showUpdateBanner(() => worker.postMessage("SKIP_WAITING"));
       };
@@ -3150,6 +3463,109 @@ if ("serviceWorker" in navigator) {
     } catch { /* offline tai estetty – sovellus toimii silti */ }
   });
 }
+// Asetuksista käynnistetty päivityshaku. Selain tarkistaa sw.js:n normaalisti vain
+// silloin tällöin, joten kotivalikkoon lisätty sovellus voi jäädä vanhaan versioon.
+async function checkForUpdate(btn, status) {
+  const say = (msg) => { if (status) status.textContent = msg; };
+  if (!("serviceWorker" in navigator)) {
+    say("Selain ei tue automaattista päivitystä. Sulje sovellus kokonaan ja avaa se uudelleen.");
+    return;
+  }
+  if (navigator.onLine === false) {
+    say("Ei verkkoyhteyttä – yritä uudelleen kun olet verkossa.");
+    return;
+  }
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Tarkistetaan…";
+  say("");
+  try {
+    const reg = swReg || (await navigator.serviceWorker.getRegistration());
+    if (!reg) {
+      say("Päivitystä ei voitu tarkistaa. Sulje sovellus ja avaa se uudelleen.");
+      return;
+    }
+    await reg.update();
+    const waiting = await waitForInstalled(reg);
+    if (waiting) {
+      btn.textContent = "Päivitetään…";
+      say("Uusi versio ladattu – sovellus käynnistyy uudelleen hetken kuluttua.");
+      // controllerchange-kuuntelija lataa sivun, kun uusi worker ottaa ohjat.
+      waiting.postMessage("SKIP_WAITING");
+      return;
+    }
+    say(`Käytössä on jo uusin versio (${APP_VERSION}).`);
+  } catch {
+    say("Päivityksen tarkistus epäonnistui. Yritä myöhemmin uudelleen.");
+  } finally {
+    if (btn.textContent !== "Päivitetään…") {
+      btn.disabled = false;
+      btn.textContent = label;
+    }
+  }
+}
+
+// reg.update() palaa jo ennen kuin uusi worker on ehtinyt asentua, joten odotetaan
+// asennuksen valmistumista (enintään 15 s) ennen kuin todetaan "ei päivitystä".
+function waitForInstalled(reg, timeoutMs = 15000) {
+  if (reg.waiting) return Promise.resolve(reg.waiting);
+  const w = reg.installing;
+  if (!w) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const done = (v) => { clearTimeout(timer); resolve(v); };
+    const timer = setTimeout(() => resolve(reg.waiting || null), timeoutMs);
+    w.addEventListener("statechange", () => {
+      if (w.state === "installed") done(reg.waiting || w);
+      else if (w.state === "redundant") done(null);
+    });
+  });
+}
+
+// Pakotettu uudelleenasennus. iOS:n kotivalikkosovellus pitää vanhaa versiota
+// sitkeästi: pelkkä registration.update() ei aina pure, koska myös selaimen oma
+// HTTP-välimuisti palauttaa vanhan sw.js:n. Tämä purkaa koko asennuksen –
+// service worker pois, välimuistit tyhjiksi – ja lataa sovelluksen uudelleen.
+// localStorageen ei kosketa, joten kirjaukset säilyvät.
+async function forceReinstall(btn, status) {
+  const say = (msg) => { if (status) status.textContent = msg; };
+  if (navigator.onLine === false) {
+    // Ilman verkkoa tyhjennetty välimuisti jättäisi sovelluksen avautumattomaksi.
+    say("Ei verkkoyhteyttä. Pakotettu uudelleenasennus lataa kaikki tiedostot uudelleen, joten se vaatii verkon.");
+    return;
+  }
+  const ok = confirm(
+    "Asennetaanko sovellus uudelleen?\n\n" +
+    "Välimuisti tyhjennetään ja kaikki tiedostot ladataan uudelleen. " +
+    "Kirjauksesi (vuorot, keikat, asetukset) säilyvät.\n\n" +
+    "Vaatii verkkoyhteyden, äläkä sulje sovellusta latauksen aikana."
+  );
+  if (!ok) return;
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Asennetaan…";
+  say("Poistetaan vanha asennus…");
+  try {
+    if ("serviceWorker" in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister()));
+    }
+    if (window.caches) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+    say("Ladataan uusin versio…");
+    // Kertakäyttöinen kyselyparametri ohittaa iOS:n oman HTTP-välimuistin,
+    // joka muuten tarjoaisi saman vanhan tiedoston uudelleen.
+    const base = location.href.split("#")[0].split("?")[0];
+    location.replace(`${base}?reinstall=${Date.now()}${location.hash}`);
+  } catch (e) {
+    console.error("Uudelleenasennus epäonnistui", e);
+    btn.disabled = false;
+    btn.textContent = label;
+    say("Uudelleenasennus epäonnistui. Sulje sovellus kokonaan ja avaa se uudelleen.");
+  }
+}
+
 function showUpdateBanner(onUpdate) {
   if (document.querySelector(".update-banner")) return;
   const b = document.createElement("div");
