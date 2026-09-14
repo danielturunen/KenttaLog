@@ -24,6 +24,7 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
+  font-optical-sizing: auto;
   line-height: 1.45;
   background:
     radial-gradient(900px 500px at 100% -10%, color-mix(in srgb, var(--primary) 16%, transparent), transparent 60%),
@@ -40,10 +41,17 @@ body.modal-open { overflow: hidden; }
   padding: calc(var(--appbar-h) + env(safe-area-inset-top) + 14px) 16px calc(var(--tabbar-h) + 28px);
 }
 
-h1 { font-size: 1.55rem; margin: 0; letter-spacing: -.02em; }
-h2 { font-size: 1.08rem; letter-spacing: -.01em; }
+/* Typografia: tracking ja riviväli ovat kokokohtaisia. Iso teksti kaipaa
+   tiukempaa kirjainväliä ja riviväliä, pieni teksti hieman väljempää
+   kirjainväliä luettavuuden vuoksi. Yksi arvo kaikille olisi väärin
+   jommassakummassa päässä. */
+h1 { font-size: 1.55rem; margin: 0; letter-spacing: -.021em; line-height: 1.15; }
+h2 { font-size: 1.08rem; letter-spacing: -.011em; line-height: 1.3; }
+h3 { letter-spacing: -.006em; line-height: 1.35; }
 a { color: inherit; text-decoration: none; }
 .muted { color: var(--muted); font-size: .9rem; }
+/* Pienin teksti: hieman positiivinen tracking pitää sen erottuvana. */
+.small, .col-lab, .hcol-lab, .sc-code, .tabbar a, .hint, .footnote { letter-spacing: .008em; }
 .center { text-align: center; padding: 24px 0; }
 .sub { color: var(--muted); font-size: .9rem; margin: 3px 0 0; }
 
@@ -56,7 +64,13 @@ a { color: inherit; text-decoration: none; }
   background: color-mix(in srgb, var(--bg) 78%, transparent);
   backdrop-filter: saturate(160%) blur(14px);
   -webkit-backdrop-filter: saturate(160%) blur(14px);
-  border-bottom: 1px solid var(--border);
+}
+/* Vieritysreuna kovan viivan sijaan: sisältö häivähtää palkin alle sen sijaan
+   että katkeaisi 1px viivaan. Palkki on kelluva kerros, ei laatikon reuna. */
+.appbar::after {
+  content: ""; position: absolute; top: 100%; left: 0; right: 0; height: 16px;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--bg) 72%, transparent), transparent);
+  pointer-events: none;
 }
 .brand { display: flex; align-items: center; gap: 9px; font-weight: 800; letter-spacing: -.02em; }
 .brand-mark {
@@ -467,7 +481,13 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; }
   height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
   background: color-mix(in srgb, var(--bg) 80%, transparent);
   backdrop-filter: saturate(160%) blur(16px); -webkit-backdrop-filter: saturate(160%) blur(16px);
-  border-top: 1px solid var(--border); display: flex; padding-bottom: env(safe-area-inset-bottom); z-index: 40;
+  display: flex; padding-bottom: env(safe-area-inset-bottom); z-index: 40;
+}
+/* Vieritysreuna myös alapalkille, peilikuvana ylälaidan häivytykselle. */
+.tabbar::after {
+  content: ""; position: absolute; bottom: 100%; left: 0; right: 0; height: 16px;
+  background: linear-gradient(to top, color-mix(in srgb, var(--bg) 74%, transparent), transparent);
+  pointer-events: none;
 }
 .tabbar a { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--muted); font-size: .68rem; font-weight: 700; position: relative; transition: color .15s; }
 .tabbar a .ti { font-size: 1.35rem; transition: transform .15s; }
@@ -704,6 +724,10 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; }
 
 @media (prefers-reduced-transparency: reduce) {
   .appbar, .tabbar { backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--bg); }
+  /* Läpinäkymättömän palkin kanssa häivytys ei erota mitään – takaisin viivaan. */
+  .appbar::after, .tabbar::after { background: none; }
+  .appbar { border-bottom: 1px solid var(--border); }
+  .tabbar { border-top: 1px solid var(--border); }
   .modal-wrap { backdrop-filter: none; background: rgba(0,0,0,.75); }
 }
 
@@ -712,6 +736,14 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; }
    jäisi tehottomaksi tai rikkoisi vaalean teeman. Vahvistetaan vain rakennetta. */
 @media (prefers-contrast: more) {
   .appbar, .tabbar { background: var(--bg); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .appbar::after, .tabbar::after { background: none; }
+  .appbar { border-bottom: 1px solid var(--border); }
+  .tabbar { border-top: 1px solid var(--border); }
   .btn, .card, .call, .chip, .qc-chip { border-width: 2px; }
   :focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
 }
+
+/* ---------- Tilastojen jaksopyyhkäisy ----------
+   Pystyvieritys jää selaimelle, vaakasuunta on meidän. */
+.stats-swipe { touch-action: pan-y; }
+.stats-swipe .swipe-body { will-change: transform; }

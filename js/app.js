@@ -12,7 +12,7 @@ import { STATIONS, stationLabel, ALL_UNITS, findStation, stationColor, DEFAULT_A
 
 // ---------- Lista + oma syöte -valitsimet (asema / yksikkö) ----------
 // Sovelluksen versio – pidä samana kuin sw.js:n välimuistiversio.
-const APP_VERSION = "v65";
+const APP_VERSION = "v66";
 
 const CUSTOM = "__custom__";
 
@@ -1304,7 +1304,7 @@ function renderCalls() {
     </div>
   `;
   const q = document.getElementById("q");
-  q.oninput = debounce(() => { callFilter.q = q.value; renderCalls(); restoreFocus("q"); }, 200);
+  q.oninput = frameThrottle(() => { callFilter.q = q.value; renderCalls(); restoreFocus("q"); });
   document.getElementById("f-urg").onchange = (e) => { callFilter.urgency = e.target.value; renderCalls(); };
   document.getElementById("f-lead").onchange = (e) => { callFilter.lead = e.target.value; renderCalls(); };
   document.getElementById("f-incomplete").onclick = () => { callFilter.incomplete = !callFilter.incomplete; renderCalls(); };
@@ -1349,11 +1349,13 @@ function renderStats() {
     app.innerHTML = `
       <header class="page-head"><h1>Tilastot</h1></header>
       ${periodBar}
+      <div class="stats-swipe"><div class="swipe-body">
       <div class="empty">
         <div class="empty-icon">📊</div>
         <h2>${statsGran !== "all" ? "Ei keikkoja tältä ajalta" : "Ei vielä dataa"}</h2>
-        <p>${statsGran !== "all" ? "Valitse toinen viikko/päivä tai koko jakso." : "Kirjaa vuoroja ja keikkoja, niin tilastot kertyvät tähän automaattisesti."}</p>
-      </div>`;
+        <p>${statsGran !== "all" ? "Valitse toinen viikko/päivä tai pyyhkäise sivuun." : "Kirjaa vuoroja ja keikkoja, niin tilastot kertyvät tähän automaattisesti."}</p>
+      </div>
+      </div></div>`;
     wireStatsPeriod();
     return;
   }
@@ -1363,6 +1365,7 @@ function renderStats() {
   app.innerHTML = `
     <header class="page-head"><h1>Tilastot</h1></header>
     ${periodBar}
+    <div class="stats-swipe"><div class="swipe-body">
     ${statsPeriodNote()}
 
     <div class="kpis kpis-4">
@@ -1448,6 +1451,7 @@ function renderStats() {
     <div class="list compact">
       ${s.topTags.length ? s.topTags.map(([t, n]) => `<div class="ranked"><span class="cname">${esc(t)}</span><span class="rcount">${n}</span></div>`).join("") : `<p class="muted">Ei merkintöjä vielä.</p>`}
     </div>
+    </div></div>
   `;
 
   const toggle = document.getElementById("act-toggle");
@@ -1491,6 +1495,92 @@ function wireStatsPeriod() {
   app.querySelectorAll(".period-chip[data-v]").forEach((b) => {
     b.onclick = () => { statsValue = b.dataset.v; renderStats(); };
   });
+  wireStatsSwipe();
+}
+
+// Mistä ja millä nopeudella seuraava jakso liukuu sisään. Asetetaan juuri
+// ennen renderStatsia, luetaan heti uuden sisällön synnyttyä.
+let statsSwipeEnter = null;
+
+// Jakson vaihto pyyhkäisemällä. Pystysuunta jää selaimen vieritykselle
+// (CSS: touch-action: pan-y), vaakasuunta on meidän. Vaakasuunnassa vierivien
+// osien päältä aloitettu veto jätetään niille.
+function wireStatsSwipe() {
+  const box = app.querySelector(".stats-swipe");
+  const body = app.querySelector(".swipe-body");
+  if (!box || !body) return;
+  const move = (v) => { body.style.transform = `translate3d(${v}px,0,0)`; };
+
+  // Sisääntulo: uusi jakso jatkaa siitä mihin naapuri oli vedetty.
+  if (statsSwipeEnter) {
+    const { from, velocity } = statsSwipeEnter;
+    statsSwipeEnter = null;
+    if (!reduceMotion.matches) {
+      move(from);
+      spring({ from, to: 0, velocity, damping: 1, response: 0.36, onUpdate: move });
+    }
+  }
+
+  const list = statsGran === "week" ? statsWeeks() : statsGran === "day" ? statsDays() : [];
+  const idx = list.indexOf(statsValue);
+  if (list.length < 2 || idx < 0) return;
+
+  const width = () => box.getBoundingClientRect().width || window.innerWidth;
+  let pid = null, x0 = 0, y0 = 0, dx = 0, axis = null, hist = [], anim = null;
+
+  box.addEventListener("pointerdown", (e) => {
+    if (e.button) return;
+    // Vaakasuunnassa vierivä sisältö saa pitää eleensä itsellään.
+    if (e.target.closest(".colchart, .hourchart, .period-bar, input, select, textarea")) return;
+    pid = e.pointerId; x0 = e.clientX; y0 = e.clientY; dx = 0; axis = null;
+    hist = [{ x: e.clientX, t: performance.now() }];
+    if (anim) { anim.stop(); anim = null; }
+  });
+
+  box.addEventListener("pointermove", (e) => {
+    if (e.pointerId !== pid) return;
+    const ddx = e.clientX - x0, ddy = e.clientY - y0;
+    if (!axis) {
+      // Kumpaa elettä ollaan tekemässä – päätetään vasta kun suunta on selvä.
+      if (Math.abs(ddx) < 10 && Math.abs(ddy) < 10) return;
+      axis = Math.abs(ddx) > Math.abs(ddy) ? "x" : "y";
+      if (axis === "x") box.setPointerCapture(pid);
+      else { pid = null; return; }
+    }
+    hist.push({ x: e.clientX, t: performance.now() });
+    if (hist.length > 6) hist.shift();
+    // Uusinta ennen ja vanhinta jälkeen ei ole mitään – reuna vastustaa.
+    const atEdge = (ddx > 0 && idx === 0) || (ddx < 0 && idx === list.length - 1);
+    dx = atEdge ? Math.sign(ddx) * rubberband(Math.abs(ddx), width()) : ddx;
+    move(dx);
+  });
+
+  const end = (e) => {
+    if (e.pointerId !== pid) return;
+    pid = null;
+    if (axis !== "x") return;
+    const now = performance.now();
+    const ref = hist.find((p) => now - p.t < 120) || hist[0];
+    const vx = ref ? (e.clientX - ref.x) / Math.max((now - ref.t) / 1000, 0.001) : 0;
+    const projected = dx + projectMomentum(vx);
+    const dir = projected < 0 ? 1 : -1;          // vasemmalle = vanhempaan päin
+    const next = idx + dir;
+    if (Math.abs(projected) > width() * 0.25 && next >= 0 && next < list.length) {
+      haptic("tap");
+      // Naapuri on levyn verran sivussa nykyisestä kohdasta – sieltä se tulee.
+      statsSwipeEnter = { from: dx + dir * width(), velocity: vx };
+      statsValue = list[next];
+      renderStats();
+      return;
+    }
+    // Ei riittänyt: takaisin paikalleen sormen nopeus mukanaan.
+    anim = spring({
+      from: dx, to: 0, velocity: vx, damping: 0.9, response: 0.3,
+      onUpdate: move, onRest: () => { anim = null; },
+    });
+  };
+  box.addEventListener("pointerup", end);
+  box.addEventListener("pointercancel", end);
 }
 
 // ---------- Saavutukset (motivoiva edistyminen, lasketaan suoraan datasta) ----------
@@ -1802,7 +1892,7 @@ function renderCodes() {
     }).join("")}
   `;
   const cq = document.getElementById("cq");
-  cq.oninput = debounce(() => { codeQuery = cq.value; renderCodes(); restoreFocus("cq"); }, 200);
+  cq.oninput = frameThrottle(() => { codeQuery = cq.value; renderCodes(); restoreFocus("cq"); });
   app.querySelectorAll("[data-code]").forEach((el) => {
     el.onclick = () => openCodeInfo(el.dataset.code);
   });
@@ -2214,7 +2304,7 @@ function renderTools() {
   startQuiz();
   // Muistilistojen haku: suodata otsikon ja sisällön mukaan, avaa osumat
   const aidQ = document.getElementById("aid-q");
-  aidQ.oninput = debounce(() => {
+  aidQ.oninput = frameThrottle(() => {
     const q = aidQ.value.trim().toLowerCase();
     let hits = 0;
     document.querySelectorAll("#aid-list .aid").forEach((d) => {
@@ -2224,7 +2314,7 @@ function renderTools() {
       d.open = !!q && hit;
     });
     document.getElementById("aid-empty").style.display = hits ? "none" : "";
-  }, 150);
+  });
 }
 
 function setupCalculators() {
@@ -2310,6 +2400,7 @@ function startQuiz() {
       quizScore.total++;
       const right = b.dataset.code === correct.code;
       if (right) quizScore.ok++;
+      haptic(right ? "ok" : "warn");
       box.querySelectorAll(".quiz-opt").forEach((x) => {
         x.disabled = true;
         if (x.dataset.code === correct.code) x.classList.add("right");
@@ -3008,6 +3099,18 @@ function rubberband(overshoot, dimension, constant = 0.55) {
   return (overshoot * dimension * constant) / (dimension + constant * Math.abs(overshoot));
 }
 
+// Haptinen palaute. Vain merkityksellisiin hetkiin: kun jokin loksahtaa
+// paikalleen, onnistuu tai menee pieleen. Jos jokainen painallus värisisi,
+// käyttäjä oppisi sivuuttamaan koko palautteen. Kutsutaan samassa framessa
+// visuaalisen muutoksen kanssa – muuten aistit eivät osu yhteen.
+// iOS-Safari ei tue Vibration APIa, joten tämä on hiljainen lisä, ei perusta.
+const HAPTICS = { tap: 10, ok: [11, 45, 20], warn: [28, 55, 28] };
+function haptic(kind) {
+  const pattern = HAPTICS[kind];
+  if (!pattern || reduceMotion.matches) return;
+  try { navigator.vibrate && navigator.vibrate(pattern); } catch { /* estetty tai ei tuettu */ }
+}
+
 // ---------- Modaali ----------
 function openModal(title, bodyHtml, { onSave, extra } = {}) {
   const wrap = document.createElement("div");
@@ -3126,6 +3229,7 @@ function wireSheet(wrap) {
     // Päätös projisoidusta pysähtymiskohdasta, ei sormen irrotuskohdasta.
     if (y + projectMomentum(vel) > height() * 0.4) {
       wrap._flingVelocity = vel;
+      haptic("tap");            // paneeli irtoaa – sama frame kuin päätös
       closeModal();
     } else if (reduced) {
       y = 0;
@@ -3198,9 +3302,16 @@ function formatDateLong(iso) {
   const days = ["Sunnuntai", "Maanantai", "Tiistai", "Keskiviikko", "Torstai", "Perjantai", "Lauantai"];
   return `${days[d.getDay()]} ${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
 }
-function debounce(fn, ms) {
-  let t;
-  return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+// Hakukenttien suodatus tapahtuu paikallisesti muistissa – verkkoa ei odoteta,
+// joten viive on pelkkää viivettä. Ajetaan ruudunpiirron tahdissa: tulos näkyy
+// heti seuraavassa framessa, mutta nopea kirjoitus ei piirrä montaa kertaa
+// samaan frameen.
+function frameThrottle(fn) {
+  let raf = 0;
+  return (...a) => {
+    if (raf) return;
+    raf = requestAnimationFrame(() => { raf = 0; fn(...a); });
+  };
 }
 function restoreFocus(id) {
   const el = document.getElementById(id);
@@ -3249,7 +3360,9 @@ function toast(msg, opts = {}) {
     t.textContent = msg;
   }
   document.body.appendChild(t);
-  setTimeout(() => t.classList.add("show"), 10);
+  // Kaksi framea: ensimmäinen vahvistaa alkutilan, toinen käynnistää siirtymän.
+  // Kiinteä 10 ms oli arvaus siitä, milloin selain on ehtinyt – tämä tietää sen.
+  requestAnimationFrame(() => requestAnimationFrame(() => t.classList.add("show")));
   const ms = opts.ms || 2000;
   setTimeout(() => { t.classList.remove("show"); setTimeout(() => t.remove(), 300); }, ms);
 }
