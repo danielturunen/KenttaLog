@@ -22,6 +22,8 @@ const DEFAULT_DATA = {
       "Terveyskeskus",
       "SeHo",
     ],
+    // Keikkalomakkeen isot kohdenapit (muokattavissa asetuksissa).
+    quickDests: ["Malmi", "Meilahti", "SeHo"],
     units: [],
     defaultStation: "",
     defaultUnit: "",
