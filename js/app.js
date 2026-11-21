@@ -12,7 +12,7 @@ import { STATIONS, stationLabel, ALL_UNITS, findStation, stationColor, DEFAULT_A
 
 // ---------- Lista + oma syöte -valitsimet (asema / yksikkö) ----------
 // Sovelluksen versio – pidä samana kuin sw.js:n välimuistiversio.
-const APP_VERSION = "v69";
+const APP_VERSION = "v70";
 
 const CUSTOM = "__custom__";
 
@@ -103,21 +103,24 @@ const DISPOSITIONS = [
   ...X_OUTCOMES,
   "Muu",
 ];
-// Malmin aseman tavallisimmat kuljetuskohteet näkyvät keikkalomakkeessa
-// yhden napautuksen valintoina. Perään tulevat omista keikoista useimmin
-// käytetyt muut kohteet, jotta lista mukautuu siihen mitä oikeasti ajetaan.
-const BASE_DESTS = ["Malmi", "Meilahti", "SeHo"];
+// Kuljetuskohteiden pikavalinnat (Asetukset → Kuljetuskohteet). Perään tulevat
+// omista keikoista useimmin käytetyt muut kohteet, jotta lista mukautuu siihen
+// mitä oikeasti ajetaan.
+function baseDests() {
+  return getSettings().quickDests || [];
+}
 function quickDestinations() {
+  const base = baseDests();
   const counts = {};
   for (const c of getAllCalls()) {
     if (c.destination) counts[c.destination] = (counts[c.destination] || 0) + 1;
   }
   const extra = Object.entries(counts)
-    .filter(([d, n]) => n >= 2 && !BASE_DESTS.some((b) => b.toLowerCase() === d.toLowerCase()))
+    .filter(([d, n]) => n >= 2 && !base.some((b) => b.toLowerCase() === d.toLowerCase()))
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3)
     .map(([d]) => d);
-  return [...BASE_DESTS, ...extra];
+  return [...base, ...extra];
 }
 
 // Meilahden teho-osaston moduulit (valitaan, kun kohde on teho-osasto)
@@ -276,6 +279,8 @@ function renderHome() {
     <div id="home-body"></div>
   `;
   document.getElementById("newShift").onclick = () => openShiftForm();
+  const qsStation = document.getElementById("qs-station");
+  if (qsStation) qsStation.onclick = () => openStationPicker();
   const quickStart = document.getElementById("qs-day");
   if (quickStart) {
     quickStart.onclick = () => {
@@ -404,14 +409,16 @@ function todayCardHtml(shifts) {
 // sen ei pitäisi vaatia lomaketta.
 function startDayCardHtml() {
   const d = newShiftDefaults();
-  const where = [d.station, d.unit].filter(Boolean).map(esc).join(" · ");
+  const where = d.station
+    ? [d.station, d.unit].filter(Boolean).map(esc).join(" · ") + (d.ht ? " · HT" : " · PT")
+    : "Asema valitsematta";
   return `
     <div class="today-card start-card" style="--sc:${stationColor(d.station) || "var(--primary)"}">
       <div class="tc-top">
         <span class="tc-live">Ei vuoroa tänään</span>
         <span class="tc-type">Päivävuoro 9–21</span>
       </div>
-      <div class="tc-sub">${where}${d.ht ? " · HT" : " · PT"}</div>
+      <div class="tc-sub">${where} <button type="button" class="link-btn" id="qs-station">${d.station ? "Vaihda" : "Valitse asema"}</button></div>
       <button class="btn primary qs-btn" id="qs-day">Aloita päivävuoro</button>
       <p class="qs-note">Muu vuoro tai päivä: <b>+ Vuoro</b> ylhäältä.</p>
     </div>`;
@@ -524,10 +531,6 @@ function shiftCard(s) {
 }
 
 // ---------- Vuoron lisäys / muokkaus ----------
-// Harjoittelu on Malmin asemalla, joten se on oletus siihen asti, kunnes
-// asetuksissa valitaan jokin muu.
-const HOME_STATION = "Malmi (AS.50)";
-
 // Uuden vuoron oletukset: päivävuoro, oletusasema ja -yksikkö. Taso päätellään
 // yksiköstä (HE12xx = HT), muuten asetuksesta.
 function newShiftDefaults(date = today()) {
@@ -537,7 +540,7 @@ function newShiftDefaults(date = today()) {
   return {
     date,
     type: "day",
-    station: st.defaultStation || HOME_STATION,
+    station: st.defaultStation || "",
     unit,
     ht: lvl !== null ? lvl : st.defaultHt !== false,
   };
@@ -809,7 +812,7 @@ function openCallForm(shiftId, existing) {
   const quickDests = quickDestinations();
   // Ehdotuslista: omat kohteet + pikavalinnat (SeHo näkyy myös vanhoille
   // asennuksille, joiden tallennettu kohdelista on tehty ennen sitä).
-  const destOptions = [...new Set([...BASE_DESTS, ...settings.destinations])];
+  const destOptions = [...new Set([...baseDests(), ...settings.destinations])];
   const isQuickOn = (d) => c.disposition === "Kuljetettu" && (c.destination || "").toLowerCase() === d.toLowerCase();
   openModal(existing ? "Muokkaa keikkaa" : "Uusi keikka", `
     <div class="row">
@@ -2940,8 +2943,7 @@ function openEkgCardForm() {
 // ---------- Asetukset ----------
 function renderSettings() {
   const st = getSettings();
-  // Näytä se asema, jota uudet vuorot oikeasti käyttävät.
-  const defStation = st.defaultStation || HOME_STATION;
+  const defStation = st.defaultStation || "";
   app.innerHTML = `
     <header class="page-head">
       <div>
@@ -2982,8 +2984,14 @@ function renderSettings() {
 
     <section class="settings-block">
       <h2>Kuljetuskohteet</h2>
-      <p class="muted">Pilkulla eroteltuna. Näkyvät keikkalomakkeen ehdotuksissa.</p>
-      <textarea id="set-dest" rows="3">${esc(st.destinations.join(", "))}</textarea>
+      <label class="field">Pikavalinnat
+        <input type="text" id="set-qdest" value="${esc((st.quickDests || []).join(", "))}" placeholder="esim. Malmi, Meilahti, SeHo">
+      </label>
+      <p class="form-note">Isoina nappeina keikkalomakkeessa, pilkulla eroteltuna. Perään tulevat automaattisesti kohteet, joihin olet kuljettanut useimmin.</p>
+      <label class="field">Kaikki kohteet
+        <textarea id="set-dest" rows="3">${esc(st.destinations.join(", "))}</textarea>
+      </label>
+      <p class="form-note">Näkyvät ehdotuksina, kun kirjoitat kohteen itse.</p>
     </section>
 
     <section class="settings-block">
@@ -3081,6 +3089,7 @@ function renderSettings() {
   const saveSettings = () => {
     updateSettings({
       destinations: splitList(val("set-dest")),
+      quickDests: splitList(val("set-qdest")),
       tags: splitList(val("set-tags")),
       goals: parseGoals(val("set-goals")),
       internshipStart: val("set-istart"),
@@ -3094,7 +3103,7 @@ function renderSettings() {
     applyAccent();
     toast("Tallennettu");
   };
-  const autosaveIds = ["set-dest", "set-tags", "set-goals", "set-istart", "set-iend", "set-thours",
+  const autosaveIds = ["set-qdest", "set-dest", "set-tags", "set-goals", "set-istart", "set-iend", "set-thours",
     "set-tshifts", "set-defstation", "set-defstation-custom", "set-defunit", "set-defunit-custom", "set-defht"];
   for (const id of autosaveIds) {
     const el = document.getElementById(id);
@@ -3498,12 +3507,69 @@ function updateStationChip(station) {
   }
 }
 
+// Oletusaseman ja -yksikön pikavaihto. Avataan yläpalkin asemasta ja
+// etusivun pikaaloituksesta, jotta asemaa voi vaihtaa kahdella napautuksella
+// – esim. kun harjoittelu siirtyy toiselle asemalle tai vuoro on lainassa.
+function openStationPicker() {
+  const draw = () => {
+    const st = getSettings();
+    const cur = findStation(st.defaultStation);
+    const units = cur ? cur.units : [];
+    return `
+      <p class="muted">Uudet vuorot ja <b>Aloita päivävuoro</b> käyttävät tätä. Voit vaihtaa milloin vain; jo kirjatut vuorot eivät muutu.</p>
+      <div class="st-pick">
+        ${STATIONS.map((s) => `<button type="button" class="st-opt ${cur === s ? "on" : ""}" data-st="${esc(stationLabel(s))}" style="--stc:${s.color}">
+          <span class="sc-dot" style="background:${s.color}"></span><span class="st-name">${esc(s.name)}</span><span class="sc-code">${esc(s.code)}</span></button>`).join("")}
+      </div>
+      ${units.length ? `<label>Yksikkö
+        <div class="seg" id="sp-units">
+          ${units.map((u) => `<button type="button" data-u="${esc(u)}" class="${st.defaultUnit === u ? "on" : ""}">${esc(u)}</button>`).join("")}
+        </div>
+      </label>` : ""}
+      <button type="button" class="link-btn" id="sp-clear">Ei oletusasemaa</button>
+      <p class="form-note">Oman, listasta puuttuvan aseman voi kirjoittaa Asetuksissa.</p>`;
+  };
+  openModal("Oletusasema", `<div id="sp-body">${draw()}</div>`);
+  const body = document.getElementById("sp-body");
+  const refresh = () => {
+    applyAccent();
+    route();                       // etusivun kortti ym. ajan tasalle modaalin alla
+    body.innerHTML = draw();
+    wire();
+  };
+  const wire = () => {
+    body.querySelectorAll(".st-opt").forEach((b) => {
+      b.onclick = () => {
+        const st = getSettings();
+        const station = findStation(b.dataset.st);
+        // Yksikkö säilyy vain, jos se kuuluu valittuun asemaan.
+        const unit = station && station.units.includes(st.defaultUnit) ? st.defaultUnit : "";
+        updateSettings({ defaultStation: b.dataset.st, defaultUnit: unit });
+        refresh();
+      };
+    });
+    body.querySelectorAll("#sp-units button").forEach((b) => {
+      b.onclick = () => {
+        const lvl = unitLevel(b.dataset.u);
+        updateSettings({ defaultUnit: b.dataset.u, ...(lvl !== null ? { defaultHt: lvl } : {}) });
+        refresh();
+      };
+    });
+    document.getElementById("sp-clear").onclick = () => {
+      updateSettings({ defaultStation: "", defaultUnit: "" });
+      refresh();
+    };
+  };
+  wire();
+}
+
 // ---------- Käynnistys ----------
 // Pakotetun uudelleenasennuksen kertakäyttöinen parametri on tehnyt tehtävänsä
 // heti kun sivu on latautunut – siivotaan se pois osoiteriviltä.
 if (location.search.includes("reinstall=")) {
   history.replaceState(null, "", location.pathname + location.hash);
 }
+document.getElementById("stationChip").onclick = (e) => { e.preventDefault(); openStationPicker(); };
 applyTheme(getSettings().theme);
 applyAccent();
 window.addEventListener("hashchange", route);
