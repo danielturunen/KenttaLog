@@ -320,16 +320,24 @@ a { color: inherit; text-decoration: none; }
 .urg-seg button.on { background: var(--uc); color: #fff; }
 .view-seg { max-width: 280px; margin-bottom: 16px; }
 
-/* ---------- Chips & vitals ---------- */
+/* ---------- Chips ---------- */
 .chips { display: flex; flex-wrap: wrap; gap: 7px; margin: 6px 0; }
 .chip { border: 1px solid var(--border); background: var(--bg); color: var(--text); padding: 7px 13px; border-radius: 999px; font-size: .85rem; font-weight: 600; cursor: pointer; transition: background .12s, color .12s, border-color .12s; }
 .chip.on { background: color-mix(in srgb, var(--primary) 88%, #000); color: #fff; border-color: transparent; }
-.vitals { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 6px; }
-.vitals span { display: flex; flex-direction: column; gap: 2px; }
-.vitals small { color: var(--muted); font-size: .72rem; }
-.vitals input { margin: 0; padding: 9px 8px; text-align: center; }
-.vitals-line { font-size: .82rem; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
 .head-actions { display: flex; gap: 8px; }
+
+/* Kuljetuskohteen pikavalinta: isot kosketusalueet, koska tämä on keikan
+   yleisin lopputulos ja valitaan usein ambulanssissa yhdellä kädellä. */
+.dq-cap { display: block; margin-top: 8px; font-size: .78rem; font-weight: 600; color: var(--muted); letter-spacing: .008em; }
+.dest-quick { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; margin: 6px 0 4px; }
+.dq {
+  min-height: 48px; padding: 8px 10px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+  font: inherit; font-size: .95rem; font-weight: 700; cursor: pointer;
+  transition: background .12s, border-color .12s, color .12s, transform .08s;
+}
+.dq:active { transform: scale(.97); }
+.dq.on { background: var(--primary); color: var(--primary-ink); border-color: transparent; box-shadow: 0 3px 12px color-mix(in srgb, var(--primary) 35%, transparent); }
 
 /* Info links & tips */
 .info-link { display: inline-block; margin-top: 8px; font-size: .85rem; font-weight: 700; color: var(--primary); }
@@ -514,10 +522,9 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; }
 .period-bar.sub .period-chip { padding: 6px 12px; font-size: .8rem; }
 .period-note { margin: -2px 0 10px; }
 
-/* ---------- Filter chip & role ---------- */
+/* ---------- Filter chip ---------- */
 .filter-chip { border: 1px solid var(--border); background: var(--surface); color: var(--muted); padding: 11px 14px; border-radius: var(--radius-sm); font-weight: 700; font-size: .9rem; cursor: pointer; }
 .filter-chip.on { background: color-mix(in srgb, #f5b301 22%, var(--surface)); color: #ffd874; border-color: color-mix(in srgb, #f5b301 40%, var(--border)); }
-.meta-pill.role { background: color-mix(in srgb, var(--primary) 22%, var(--surface)); color: color-mix(in srgb, var(--primary) 75%, #fff); }
 
 /* ---------- Goals ---------- */
 .goals { display: flex; flex-direction: column; gap: 12px; }
@@ -652,6 +659,12 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; }
 .tc-info { font-size: .85rem; color: var(--muted); font-weight: 600; }
 .tc-actions { display: flex; gap: 8px; margin-left: auto; }
 .tc-newcall { background: var(--sc, var(--primary)) !important; color: #fff !important; border-color: transparent !important; font-weight: 800; }
+/* Päivävuoron pikaaloitus: koko levyinen pääpainike, koska se on päivän
+   ensimmäinen ja tärkein toiminto. */
+.start-card .tc-live { color: var(--muted); }
+.qs-btn { display: block; width: 100%; margin-top: 12px; min-height: 50px; font-size: 1.02rem; }
+.start-card .qs-btn.primary { background: var(--sc, var(--primary)); box-shadow: 0 4px 14px color-mix(in srgb, var(--sc, var(--primary)) 38%, transparent); }
+.qs-note { margin: 9px 0 0; font-size: .8rem; color: var(--muted); text-align: center; }
 
 /* ---------- Duplicate button on call row ---------- */
 .dup-btn {
@@ -717,7 +730,7 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; }
   }
   /* Painallus saa yhä näkyä – se on palautetta, ei koristetta. */
   .btn:active, .card:active, .call:active, .qc-chip:active,
-  .theme-card:active, .ekg-card:active, .fab:active, .reminder:active { transform: none; }
+  .theme-card:active, .ekg-card:active, .fab:active, .reminder:active, .dq:active { transform: none; }
   .tabbar a.active .ti { transform: none; }
   .modal { transition: opacity .18s ease !important; }
 }
