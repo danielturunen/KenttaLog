@@ -9,10 +9,11 @@ import { codeInfo } from "./codeinfo.js";
 import { computeStats, shiftHours, DAYPARTS, WEEKDAYS, effectiveUrgency, weekLabel, countedShifts, countedCalls } from "./stats.js";
 import { ekgWaveSvg } from "./ekgwave.js";
 import { STATIONS, stationLabel, ALL_UNITS, findStation, stationColor, DEFAULT_ACCENT, unitLevel } from "./stations.js";
+import { TAB_ICONS, stationIcon, stationMotif } from "./icons.js";
 
 // ---------- Lista + oma syöte -valitsimet (asema / yksikkö) ----------
 // Sovelluksen versio – pidä samana kuin sw.js:n välimuistiversio.
-const APP_VERSION = "v72";
+const APP_VERSION = "v73";
 
 const CUSTOM = "__custom__";
 
@@ -395,24 +396,45 @@ function todayCardHtml(shifts) {
   const pct = running ? Math.round((elapsed / total) * 100) : 0;
   const left = running ? total - elapsed : 0;
   const leftTxt = running ? `${Math.floor(left / 60)} h ${String(left % 60).padStart(2, "0")} min jäljellä` : (elapsed < 0 ? "Alkaa myöhemmin tänään" : "Päättynyt");
-  const sub = [cur.unit, cur.station].filter(Boolean).map(esc).join(" · ");
   const head = cur.type === "day" ? "Päivävuoro 9–21" : cur.type === "night" ? "Yövuoro 21–9" : `Vuoro ${esc(cur.startTime || "")}–${esc(cur.endTime || "")}`;
+  const st = findStation(cur.station);
   return `
     <div class="today-card" style="--sc:${stationColor(cur.station) || "var(--primary)"}">
+      ${stationMotif(st)}
       <div class="tc-top">
-        <span class="tc-live">${running ? "● Vuoro käynnissä" : "Tämän päivän vuoro"}</span>
+        <span class="tc-live ${running ? "is-live" : ""}">${running ? "Vuoro käynnissä" : "Tämän päivän vuoro"}</span>
         <span class="tc-type">${head}</span>
       </div>
-      ${sub ? `<div class="tc-sub">${sub}</div>` : ""}
+      ${stationLineHtml(cur.station, cur.unit)}
+      <div class="tc-hero">
+        <span class="tc-big">${calls.length}</span>
+        <span class="tc-biglab">${calls.length === 1 ? "keikka" : "keikkaa"}</span>
+        <span class="tc-left">${leftTxt}</span>
+      </div>
       ${running ? `<div class="bartrack tc-bar"><div class="barfill" style="width:${pct}%"></div></div>` : ""}
-      <div class="tc-bottom">
-        <span class="tc-info">${calls.length} keikkaa · ${leftTxt}</span>
-        <span class="tc-actions">
-          <button class="btn ghost" id="tc-open">Avaa</button>
-          <button class="btn tc-newcall" id="tc-call">＋ Keikka</button>
-        </span>
+      <div class="tc-actions">
+        <button class="btn tinted" id="tc-open">Avaa vuoro</button>
+        <button class="btn tc-newcall" id="tc-call">＋ Keikka</button>
       </div>
     </div>`;
+}
+
+// Asema kuvakkeella, yksiköllä ja erityisosaamisella. Tuntematon (itse
+// kirjoitettu) asema näkyy tekstinä ilman erityisosaamista.
+function stationLineHtml(stationValue, unit, extra = "") {
+  const st = findStation(stationValue);
+  if (!stationValue) {
+    return `<div class="station-line"><span class="sl-ic">${stationIcon(null, 18)}</span><span class="sl-text"><span class="sl-name muted">Asema valitsematta</span></span>${extra}</div>`;
+  }
+  const name = st ? st.name : stationValue;
+  return `<div class="station-line">
+    <span class="sl-ic">${stationIcon(st, 18)}</span>
+    <span class="sl-text">
+      <span class="sl-name">${esc(name)}${st ? ` <span class="sc-code">${esc(st.code)}</span>` : ""}${unit ? ` · ${esc(unit)}` : ""}</span>
+      ${st?.spec ? `<span class="sl-spec">${esc(st.spec.label)}</span>` : ""}
+    </span>
+    ${extra}
+  </div>`;
 }
 
 // Vuoron loppuhetki (päivä 21:00, yö seuraavana aamuna 09:00, muu oma loppuaika).
@@ -484,16 +506,15 @@ function wireReflectCard() {
 // sen ei pitäisi vaatia lomaketta.
 function startDayCardHtml() {
   const d = newShiftDefaults();
-  const where = d.station
-    ? [d.station, d.unit].filter(Boolean).map(esc).join(" · ") + (d.ht ? " · HT" : " · PT")
-    : "Asema valitsematta";
+  const st = findStation(d.station);
   return `
     <div class="today-card start-card" style="--sc:${stationColor(d.station) || "var(--primary)"}">
+      ${stationMotif(st)}
       <div class="tc-top">
         <span class="tc-live">Ei vuoroa tänään</span>
-        <span class="tc-type">Päivävuoro 9–21</span>
+        <span class="tc-type">Päivävuoro 9–21 · ${d.ht ? "HT" : "PT"}</span>
       </div>
-      <div class="tc-sub">${where} <button type="button" class="link-btn" id="qs-station">${d.station ? "Vaihda" : "Valitse asema"}</button></div>
+      ${stationLineHtml(d.station, d.unit, `<button type="button" class="link-btn" id="qs-station">${d.station ? "Vaihda" : "Valitse asema"}</button>`)}
       <button class="btn primary qs-btn" id="qs-day">Aloita päivävuoro</button>
       <p class="qs-note">Muu vuoro tai päivä: <b>+ Vuoro</b> ylhäältä.</p>
     </div>`;
@@ -733,7 +754,8 @@ function renderShiftDetail(id) {
       <div>
         <a class="back" href="#/">‹ Vuorot</a>
         <h1>${formatDate(s.date)}</h1>
-        <p class="sub">${s.ht === false ? "PT" : "HT"} · ${head} · ${shiftHours(s)} h${s.unit ? " · " + esc(s.unit) : ""}${s.station ? " · " + esc(s.station) : ""}</p>
+        <p class="sub">${s.ht === false ? "PT" : "HT"} · ${head} · ${shiftHours(s)} h</p>
+        ${s.station || s.unit ? stationLineHtml(s.station, s.unit) : ""}
       </div>
       <div class="head-actions">
         <button class="btn ghost" id="summaryBtn">Yhteenveto</button>
@@ -1542,34 +1564,34 @@ function renderStats() {
 
     ${achievementsHtml(s)}
 
-    <h2 class="block-h">🗓️ Aktiivisuuskartta <span class="block-sub">viimeiset 15 viikkoa</span></h2>
+    <h2 class="block-h">Aktiivisuuskartta <span class="block-sub">viimeiset 15 viikkoa</span></h2>
     <div class="card">${heatmapHtml(s)}</div>
 
-    <h2 class="block-h">📈 Aktiivisuus ajan myötä</h2>
+    <h2 class="block-h">Aktiivisuus ajan myötä</h2>
     <div class="seg toggle-seg" id="act-toggle">
       <button type="button" data-m="day" class="${statsActivityMode === "day" ? "on" : ""}">Päivittäin</button>
       <button type="button" data-m="week" class="${statsActivityMode === "week" ? "on" : ""}">Viikoittain</button>
     </div>
     <div class="card chart-card">${activityChartHtml(s)}</div>
 
-    <h2 class="block-h">🕐 Keikat kellonajoittain</h2>
+    <h2 class="block-h">Keikat kellonajoittain</h2>
     <div class="card chart-card">
       ${hourHistHtml(s.hourHist, "var(--primary)")}
       ${s.untimedCalls ? `<p class="muted small">${s.untimedCalls} keikkaa ilman kellonaikaa ei näy tässä.</p>` : ""}
     </div>
 
-    <h2 class="block-h">🌗 Vuorokaudenaika × kiireellisyys</h2>
+    <h2 class="block-h">Vuorokaudenaika × kiireellisyys</h2>
     <p class="muted small">Mihin aikaan tulee minkä kiireellisyyden ja tyyppisiä tehtäviä. Kuljetetuilla potilailla kiireellisyys on kuljetuksen kiireellisyys.</p>
     <div class="card">${daypartHtml(s.dayparts)}</div>
 
-    <h2 class="block-h">📅 Viikonpäivät</h2>
+    <h2 class="block-h">Viikonpäivät</h2>
     <div class="card chart-card">${weekdayHtml(s.weekdayHist)}</div>
 
     ${s.shiftTypeCount.night ? `
-    <h2 class="block-h">☀️ Päivä- vs. 🌙 yövuoro</h2>
+    <h2 class="block-h">Päivä- vs. yövuoro</h2>
     <div class="cmp-grid">${shiftTypeHtml(s)}</div>` : ""}
 
-    <h2 class="block-h">🚑 Kuljetus</h2>
+    <h2 class="block-h">Kuljetus</h2>
     <div class="ring-wrap">
       <div class="ring" style="--p:${s.transportRate}"><span>${s.transportRate}%</span></div>
       <div class="ring-info">
@@ -1580,15 +1602,15 @@ function renderStats() {
 
     ${ageHtml(s)}
 
-    <h2 class="block-h">🎯 Kiireellisyys</h2>
+    <h2 class="block-h">Kiireellisyys</h2>
     <p class="muted small">Kuljetetuilla kuljetuksen kiireellisyys, muilla hälytysaste.</p>
     <div class="card">${donutHtml(urgSegments, { center: s.callCount, sub: "keikkaa" })}</div>
 
     ${leadSegments.length > 1 ? `
-    <h2 class="block-h">🛡️ Johtovastuu</h2>
+    <h2 class="block-h">Johtovastuu</h2>
     <div class="card">${donutHtml(leadSegments, { center: s.callCount, sub: "keikkaa" })}</div>` : ""}
 
-    <h2 class="block-h">🔁 Hälytys → kuljetus</h2>
+    <h2 class="block-h">Hälytys → kuljetus</h2>
     ${s.compare.total ? `
       <div class="kpis">
         ${kpi(s.compare.changeRate + " %", "kiireellisyys muuttui")}
@@ -1601,17 +1623,17 @@ function renderStats() {
       </div>` : ""}
     ` : `<p class="muted">Ei vielä kuljetuksia, joissa sekä hälytys- että kuljetusaste on kirjattu.</p>`}
 
-    <h2 class="block-h">🏷️ Yleisimmät tehtäväkoodit</h2>
+    <h2 class="block-h">Yleisimmät tehtäväkoodit</h2>
     <div class="list compact">
       ${s.topCodes.length ? s.topCodes.map((c) => `<div class="ranked"><span class="code">${esc(c.code)}</span> <span class="cname">${esc(c.name)}</span><span class="rcount">${c.n}</span></div>`).join("") : `<p class="muted">Ei dataa.</p>`}
     </div>
 
-    <h2 class="block-h">📍 Kuljetuskohteet</h2>
+    <h2 class="block-h">Kuljetuskohteet</h2>
     <div class="list compact">
       ${s.topDest.length ? s.topDest.map(([d, n]) => `<div class="ranked"><span class="cname">${esc(d)}</span><span class="rcount">${n}</span></div>`).join("") : `<p class="muted">Ei kuljetuksia.</p>`}
     </div>
 
-    <h2 class="block-h">⭐ Merkittävät tapaukset / toimenpiteet</h2>
+    <h2 class="block-h">Merkittävät tapaukset / toimenpiteet</h2>
     <div class="list compact">
       ${s.topTags.length ? s.topTags.map(([t, n]) => `<div class="ranked"><span class="cname">${esc(t)}</span><span class="rcount">${n}</span></div>`).join("") : `<p class="muted">Ei merkintöjä vielä.</p>`}
     </div>
@@ -1785,7 +1807,7 @@ function achievementsHtml(s) {
   const list = computeAchievements(s);
   const done = list.filter((a) => a.done).length;
   return `
-    <h2 class="block-h">🏅 Saavutukset <span class="block-sub">${done}/${list.length}</span></h2>
+    <h2 class="block-h">Saavutukset <span class="block-sub">${done}/${list.length}</span></h2>
     <div class="ach-grid">
       ${list.map((a) => `
         <div class="ach ${a.done ? "done" : ""}" title="${esc(a.desc)}">
@@ -1867,7 +1889,7 @@ function internshipHtml(s) {
     </div>`;
   }).join("");
 
-  return `<h2 class="block-h">🎓 Harjoittelujakso</h2><div class="goals">${barRows}${dayInfo}</div>`;
+  return `<h2 class="block-h">Harjoittelujakso</h2><div class="goals">${barRows}${dayInfo}</div>`;
 }
 
 // Lyhyet havainnot ("insights") datasta.
@@ -1881,7 +1903,7 @@ function insightsHtml(s) {
   if (s.shiftTypeCount.day && s.shiftTypeCount.night) items.push(ns > ds ? `Yövuoroissa enemmän keikkoja (${ns} vs ${ds})` : ds > ns ? `Päivävuoroissa enemmän keikkoja (${ds} vs ${ns})` : `Päivä- ja yövuorot yhtä vilkkaita`);
   if (s.distinctCodes) items.push(`Eri tehtäväkoodeja: <b>${s.distinctCodes}</b>`);
   if (!items.length) return "";
-  return `<div class="insights">${items.map((t) => `<div class="insight">💡 ${t}</div>`).join("")}</div>`;
+  return `<div class="insights">${items.map((t) => `<div class="insight">${t}</div>`).join("")}</div>`;
 }
 
 // Päivä/viikko -pylväskaavio
@@ -2010,7 +2032,7 @@ function ageHtml(s) {
   if (!known) return "";
   const max = Math.max(1, ...AGE_GROUPS.map((a) => s.byAge[a.id]));
   const missing = s.callCount - known;
-  return `<h2 class="block-h">👥 Potilaat ikäryhmittäin</h2>
+  return `<h2 class="block-h">Potilaat ikäryhmittäin</h2>
     <div class="card">
       ${AGE_GROUPS.map((a) => bar(`${a.label} ${a.hint}`, s.byAge[a.id], max, AGE_COLORS[a.id])).join("")}
       ${missing ? `<p class="muted small" style="margin:8px 0 0">${missing} keikassa ikäryhmää ei ole kirjattu.</p>` : ""}
@@ -2038,7 +2060,7 @@ function unseenHtml() {
   // Ikäryhmäaukko vain, jos ikäryhmiä ylipäätään kirjataan – muuten väite olisi väärä.
   const aged = calls.filter((c) => c.ageGroup);
   const ageGaps = aged.length >= 5 ? AGE_GROUPS.filter((a) => !aged.some((c) => c.ageGroup === a.id)) : [];
-  return `<h2 class="block-h">🧭 Vielä näkemättä <span class="block-sub">${total - unseenCount}/${total} tehtävätyyppiä nähty</span></h2>
+  return `<h2 class="block-h">Vielä näkemättä <span class="block-sub">${total - unseenCount}/${total} tehtävätyyppiä nähty</span></h2>
     <div class="card unseen-card">
       <div class="bartrack"><div class="barfill" style="width:${pct}%"></div></div>
       ${ageGaps.length ? `<p class="unseen-age">Ei vielä yhtään potilasta ryhmästä: <b>${ageGaps.map((a) => `${a.label.toLowerCase()} (${a.hint})`).join(", ")}</b></p>` : ""}
@@ -3653,10 +3675,10 @@ function updateStationChip(station) {
   const chip = document.getElementById("stationChip");
   if (!chip) return;
   if (station) {
-    chip.innerHTML = `<span class="sc-dot" style="background:${station.color}"></span>${esc(station.name)} <span class="sc-code">${esc(station.code)}</span>`;
+    chip.innerHTML = `<span class="sc-ic" style="color:${station.color}">${stationIcon(station, 15)}</span>${esc(station.name)} <span class="sc-code">${esc(station.code)}</span>`;
     chip.classList.add("set");
   } else {
-    chip.innerHTML = `<span class="sc-dot"></span>Valitse asema`;
+    chip.innerHTML = `<span class="sc-ic">${stationIcon(null, 15)}</span>Valitse asema`;
     chip.classList.remove("set");
   }
 }
@@ -3673,7 +3695,9 @@ function openStationPicker() {
       <p class="muted">Uudet vuorot ja <b>Aloita päivävuoro</b> käyttävät tätä. Voit vaihtaa milloin vain; jo kirjatut vuorot eivät muutu.</p>
       <div class="st-pick">
         ${STATIONS.map((s) => `<button type="button" class="st-opt ${cur === s ? "on" : ""}" data-st="${esc(stationLabel(s))}" style="--stc:${s.color}">
-          <span class="sc-dot" style="background:${s.color}"></span><span class="st-name">${esc(s.name)}</span><span class="sc-code">${esc(s.code)}</span></button>`).join("")}
+          <span class="st-ic">${stationIcon(s, 18)}</span>
+          <span class="st-text"><span class="st-name">${esc(s.name)} <span class="sc-code">${esc(s.code)}</span></span>${s.spec ? `<span class="st-spec">${esc(s.spec.label)}</span>` : ""}</span>
+        </button>`).join("")}
       </div>
       ${units.length ? `<label>Yksikkö
         <div class="seg" id="sp-units">
@@ -3723,6 +3747,7 @@ function openStationPicker() {
 if (location.search.includes("reinstall=")) {
   history.replaceState(null, "", location.pathname + location.hash);
 }
+document.querySelectorAll(".tabbar [data-icon]").forEach((el) => { el.innerHTML = TAB_ICONS[el.dataset.icon] || ""; });
 document.getElementById("stationChip").onclick = (e) => { e.preventDefault(); openStationPicker(); };
 applyTheme(getSettings().theme);
 applyAccent();
