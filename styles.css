@@ -756,6 +756,131 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; }
 .ekg-summary { text-align: center; padding: 32px 20px; }
 .ekg-summary h2 { margin-top: 8px; }
 
+/* ==========================================================================
+   Moderni ulkoasu
+   Yksi tyylikerros perussääntöjen päällä: hiusviivareunat varjojen sijaan,
+   isot otsikot, tasaiset (ei liukuväri) napit ja aseman identiteetti
+   kuviona. Tulee ennen saavutettavuussääntöjä, jotta ne voittavat yhä.
+   Teemat (THEMES app.js:ssä) asettavat vain värit, joten tämä toimii
+   kaikissa teemoissa, myös vaaleissa.
+   ========================================================================== */
+:root {
+  --radius: 20px;
+  --radius-sm: 13px;
+  /* Hiusviiva tekstin väristä: näkyy sekä tummassa että vaaleassa teemassa. */
+  --hair: color-mix(in srgb, var(--text) 9%, transparent);
+  --hair-strong: color-mix(in srgb, var(--text) 14%, transparent);
+  --shadow: 0 1px 2px rgba(0,0,0,.14), 0 10px 26px -16px rgba(0,0,0,.45);
+  --shadow-lg: 0 28px 56px -20px rgba(0,0,0,.55);
+}
+body {
+  background:
+    radial-gradient(1100px 520px at 50% -260px, color-mix(in srgb, var(--primary) 20%, transparent), transparent 72%),
+    var(--bg);
+  background-attachment: fixed;
+}
+
+/* Typografia: isot sivuotsikot, selkeä porrastus väliotsikoihin. */
+h1 { font-size: 2rem; font-weight: 800; letter-spacing: -.03em; line-height: 1.08; }
+.page-head { margin: 8px 0 18px; }
+.block-h { font-size: 1.18rem; font-weight: 750; letter-spacing: -.016em; margin: 34px 0 12px; }
+.block-sub { font-size: .78rem; font-weight: 650; }
+.sub { font-size: .88rem; }
+
+/* Pinnat: hiusviiva + pehmeä varjo. */
+.card, .call, .goal, .settings-block, .insight, .kpi, .modal, .reminder, .theme-card, .ekg-card { border-color: var(--hair); }
+.card, .goal, .settings-block, .call { box-shadow: var(--shadow); }
+.kpi { background: var(--surface); box-shadow: none; padding: 14px 8px; }
+.kpi-val { font-weight: 800; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+.kpis.kpis-4 .kpi-val { font-size: 1.45rem; }
+.insight {
+  background: var(--surface); border: 1px solid var(--hair); padding: 11px 14px 11px 30px; position: relative;
+  border-radius: var(--radius-sm); font-size: .9rem;
+}
+.insight::before { content: ""; position: absolute; left: 13px; top: 50%; width: 7px; height: 7px; margin-top: -3.5px; border-radius: 50%; background: var(--primary); }
+.shift-card.is-today { border-color: color-mix(in srgb, var(--primary) 60%, var(--hair)); box-shadow: var(--shadow); }
+.meta-pill.tag { background: color-mix(in srgb, #8b5cf6 22%, var(--surface)); color: color-mix(in srgb, #8b5cf6 70%, var(--text)); }
+
+/* Napit: tasainen pääväri, sävytetty toissijainen, 44 px kosketusalue. */
+.btn {
+  min-height: 44px; border-radius: 12px; border-color: var(--hair); background: var(--surface-2);
+  font-weight: 650; letter-spacing: -.005em;
+}
+.btn.primary { background: var(--primary); box-shadow: none; }
+.btn.primary:hover { filter: brightness(1.06); }
+.btn.ghost { background: transparent; border-color: var(--hair-strong); }
+.btn.tinted {
+  background: color-mix(in srgb, var(--sc, var(--primary)) 16%, transparent); border-color: transparent;
+  color: color-mix(in srgb, var(--sc, var(--primary)) 62%, var(--text));
+}
+.fab { box-shadow: 0 10px 24px -8px color-mix(in srgb, var(--primary) 70%, transparent); }
+
+/* Segmenttivalitsin: valittu = kohotettu pilleri. */
+.seg { border-radius: 13px; padding: 4px; gap: 4px; }
+.seg button { border-radius: 10px; }
+.seg button.on { box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+
+/* Modaali: pyöreämpi, hiusviiva. */
+.modal { border-radius: 26px 26px 0 0; }
+@media (min-width: 580px) { .modal { border-radius: 26px; } }
+
+/* ---------- Alapalkki SVG-kuvakkeilla ---------- */
+.tabbar a { gap: 3px; font-size: .66rem; font-weight: 650; }
+.tabbar a .ti { display: grid; place-items: center; width: 46px; height: 30px; border-radius: 999px; transition: background .2s, color .2s; }
+.tabbar a .ti svg { display: block; }
+.tabbar a.active .ti { transform: none; background: color-mix(in srgb, var(--primary) 18%, transparent); }
+.tabbar a.active::before { display: none; }
+.tabbar svg .knob { fill: var(--bg); }
+
+/* ---------- Aseman identiteetti ---------- */
+.station-chip { gap: 6px; border-color: var(--hair); }
+.sc-ic { display: grid; place-items: center; flex: none; color: var(--muted); }
+.station-line { display: flex; align-items: center; gap: 11px; margin-top: 12px; }
+.sl-ic {
+  width: 36px; height: 36px; border-radius: 11px; flex: none; display: grid; place-items: center;
+  color: var(--sc, var(--primary)); background: color-mix(in srgb, var(--sc, var(--primary)) 17%, transparent);
+}
+.sl-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.sl-name { font-weight: 700; font-size: .95rem; }
+.sl-spec { font-size: .78rem; font-weight: 650; color: color-mix(in srgb, var(--sc, var(--primary)) 60%, var(--text)); }
+.station-line .link-btn { margin-left: auto; align-self: center; }
+.page-head .station-line { margin-top: 10px; }
+
+/* Vuorokortti: aseman kuvio taustalla, iso keikkamäärä. */
+.today-card {
+  position: relative; overflow: hidden; isolation: isolate; padding: 18px 18px 16px; border-radius: 24px;
+  background: linear-gradient(155deg, color-mix(in srgb, var(--sc, var(--primary)) 26%, var(--surface)) 0%, var(--surface) 72%);
+  border: 1px solid color-mix(in srgb, var(--sc, var(--primary)) 32%, var(--hair));
+}
+.motif {
+  position: absolute; z-index: -1; right: -6px; top: 0; height: 100%; width: 78%;
+  color: var(--sc, var(--primary)); opacity: .24; pointer-events: none;
+  -webkit-mask-image: linear-gradient(to left, #000 35%, transparent);
+          mask-image: linear-gradient(to left, #000 35%, transparent);
+}
+.tc-live { display: inline-flex; align-items: center; gap: 7px; letter-spacing: .06em; font-size: .74rem; }
+.tc-live.is-live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 22%, transparent); }
+.tc-hero { display: flex; align-items: baseline; gap: 7px; margin: 16px 0 10px; }
+.tc-big { font-size: 2.7rem; font-weight: 800; letter-spacing: -.045em; line-height: .9; font-variant-numeric: tabular-nums; }
+.tc-biglab { font-weight: 700; color: var(--muted); }
+.tc-left { margin-left: auto; font-size: .84rem; font-weight: 650; color: var(--muted); text-align: right; }
+.tc-bar { margin-top: 0; height: 6px; }
+.tc-actions { display: grid; grid-template-columns: 1fr 1.35fr; gap: 10px; margin: 14px 0 0; }
+.tc-newcall { font-weight: 750; }
+.start-card .qs-btn { margin-top: 16px; min-height: 52px; border-radius: 14px; box-shadow: none; }
+
+/* Asemavalitsin: kuvake, nimi ja erityisosaaminen. */
+.st-pick { grid-template-columns: 1fr; gap: 8px; }
+@media (min-width: 560px) { .st-pick { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.st-opt { gap: 11px; padding: 10px 12px; border-color: var(--hair); border-radius: 14px; }
+.st-ic {
+  width: 34px; height: 34px; border-radius: 10px; flex: none; display: grid; place-items: center;
+  color: var(--stc); background: color-mix(in srgb, var(--stc) 16%, transparent);
+}
+.st-text { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.st-spec { font-size: .74rem; font-weight: 600; color: var(--muted); }
+.st-opt.on .st-spec { color: color-mix(in srgb, var(--stc) 60%, var(--text)); }
+
 /* ---------- Saavutettavuus: liike, läpinäkyvyys, kontrasti ----------
    Käyttöjärjestelmän asetukset ohittavat sovelluksen oletukset. Vähennetty
    liike ei tarkoita palautteen poistamista, vaan lempeämpää muotoa: ristiin
@@ -807,7 +932,7 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; }
   font-size: .85rem; font-weight: 700; color: var(--sc, var(--primary)); cursor: pointer;
   text-decoration: underline; text-underline-offset: 3px;
 }
-.st-pick { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 12px 0 16px; }
+.st-pick { display: grid; grid-template-columns: 1fr; gap: 8px; margin: 12px 0 16px; }
 .st-opt {
   display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 8px 12px;
   border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-2);
