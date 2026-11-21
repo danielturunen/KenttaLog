@@ -32,6 +32,7 @@ export function computeStats(filterFn = null) {
   const byCode = {};
   const byDest = {};
   const byTag = {};
+  const byAge = { lapsi: 0, aikuinen: 0, iakas: 0 };
   let transported = 0;
 
   // Aika-analyysi
@@ -69,6 +70,7 @@ export function computeStats(filterFn = null) {
     byLead[lead] = (byLead[lead] || 0) + 1;
     if (c.code) byCode[c.code] = (byCode[c.code] || 0) + 1;
     for (const t of c.tags || []) byTag[t] = (byTag[t] || 0) + 1;
+    if (byAge[c.ageGroup] != null) byAge[c.ageGroup]++;
 
     // Aika-analyysi
     const hour = parseHour(c.time);
@@ -164,6 +166,7 @@ export function computeStats(filterFn = null) {
   return {
     topTags,
     byTag,
+    byAge,
     compare: {
       total: cmpTotal, urgSame, urgChanged, urgDown, urgUp, codeChanged,
       changeRate: cmpTotal ? Math.round((urgChanged / cmpTotal) * 100) : 0,
