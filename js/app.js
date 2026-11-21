@@ -13,7 +13,7 @@ import { TAB_ICONS, stationIcon, stationMotif } from "./icons.js";
 
 // ---------- Lista + oma syöte -valitsimet (asema / yksikkö) ----------
 // Sovelluksen versio – pidä samana kuin sw.js:n välimuistiversio.
-const APP_VERSION = "v73";
+const APP_VERSION = "v74";
 
 const CUSTOM = "__custom__";
 
@@ -229,6 +229,7 @@ function route() {
     ? parseHash(hash)
     : ["home", null];
   setActiveTab(path);
+  app.scrollTop = 0;          // sisältö vierii #appissa (ks. sovelluskuori styles.css)
   window.scrollTo(0, 0);
   applyAccent(); // oletusaseman teema; vuoronäkymät korvaavat omalla asemallaan
   switch (path) {
@@ -3740,6 +3741,23 @@ function openStationPicker() {
   };
   wire();
 }
+
+// iOS: kun näppäimistö sulkeutuu, dokumentin vieritys voi jäädä siirtyneeksi ja
+// kiinteät palkit leijumaan. Dokumentti ei sovelluskuoressa vieri koskaan, joten
+// sen vierityksen voi aina palauttaa nollaan – mutta vasta kun mikään kenttä
+// ei ole enää aktiivinen, ettei kirjoitettava kenttä jää näppäimistön alle.
+function resetDocumentScroll() {
+  const active = document.activeElement;
+  if (active && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)) return;
+  if (window.scrollY || document.documentElement.scrollTop || document.body.scrollTop) {
+    window.scrollTo(0, 0);
+    document.body.scrollTop = 0;
+  }
+}
+document.addEventListener("focusout", () => setTimeout(resetDocumentScroll, 120));
+window.visualViewport?.addEventListener("resize", () => {
+  if (window.visualViewport.height > window.innerHeight * 0.85) resetDocumentScroll();
+});
 
 // ---------- Käynnistys ----------
 // Pakotetun uudelleenasennuksen kertakäyttöinen parametri on tehnyt tehtävänsä
