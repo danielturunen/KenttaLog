@@ -6,13 +6,13 @@ import {
 } from "./storage.js";
 import { CODE_GROUPS, CODE_MAP, ALL_CODES, URGENCY, PROCEDURES, X_SUBCODES } from "./codes.js";
 import { codeInfo } from "./codeinfo.js";
-import { computeStats, shiftHours, DAYPARTS, WEEKDAYS, effectiveUrgency, weekLabel } from "./stats.js";
+import { computeStats, shiftHours, DAYPARTS, WEEKDAYS, effectiveUrgency, weekLabel, countedShifts, countedCalls } from "./stats.js";
 import { ekgWaveSvg } from "./ekgwave.js";
 import { STATIONS, stationLabel, ALL_UNITS, findStation, stationColor, DEFAULT_ACCENT, unitLevel } from "./stations.js";
 
 // ---------- Lista + oma syöte -valitsimet (asema / yksikkö) ----------
 // Sovelluksen versio – pidä samana kuin sw.js:n välimuistiversio.
-const APP_VERSION = "v71";
+const APP_VERSION = "v72";
 
 const CUSTOM = "__custom__";
 
@@ -273,7 +273,7 @@ function renderHome() {
     <header class="page-head">
       <div>
         <h1>Vuorot</h1>
-        <p class="sub">${shifts.length} vuoroa · ${s.callCount} keikkaa · ${s.hoursLogged} h</p>
+        <p class="sub">${s.shiftCount} vuoroa · ${s.callCount} keikkaa · ${s.hoursLogged} h${shifts.length > s.shiftCount ? ` · ${shifts.length - s.shiftCount} tulossa` : ""}</p>
       </div>
       <button class="btn primary" id="newShift">+ Vuoro</button>
     </header>
@@ -1474,12 +1474,12 @@ let statsGran = "all";
 let statsValue = null;
 function statsWeeks() {
   const set = new Set();
-  for (const sh of getShifts()) if (sh.date) set.add(isoWeekOf(sh.date));
+  for (const sh of countedShifts()) if (sh.date) set.add(isoWeekOf(sh.date));
   return [...set].sort().reverse();
 }
 function statsDays() {
   const set = new Set();
-  for (const sh of getShifts()) if (sh.date) set.add(sh.date);
+  for (const sh of countedShifts()) if (sh.date) set.add(sh.date);
   return [...set].sort().reverse();
 }
 function dayLabel(iso) {
@@ -1501,7 +1501,7 @@ function renderStats() {
   if (statsGran === "week" && statsValue && !statsWeeks().includes(statsValue)) statsValue = statsWeeks()[0] || null;
   if (statsGran === "day" && statsValue && !statsDays().includes(statsValue)) statsValue = statsDays()[0] || null;
   const s = computeStats(statsFilterFn());
-  const periodBar = getShifts().length ? statsPeriodBarHtml() : "";
+  const periodBar = countedShifts().length ? statsPeriodBarHtml() : "";
   if (s.callCount === 0) {
     app.innerHTML = `
       <header class="page-head"><h1>Tilastot</h1></header>
@@ -1752,8 +1752,8 @@ function wireStatsSwipe() {
 
 // ---------- Saavutukset (motivoiva edistyminen, lasketaan suoraan datasta) ----------
 function computeAchievements(s) {
-  const calls = getAllCalls();
-  const shifts = getShifts();
+  const calls = countedCalls();
+  const shifts = countedShifts();
   const deck = getEkgDeck();
   const ekg = ekgMastered(deck);
   const reflections = calls.filter((c) => (c.reflection || "").trim()).length;
@@ -2022,7 +2022,7 @@ function ageHtml(s) {
 // kliinistä oppimista, joten ne jätetään pois.
 const UNSEEN_SKIP = new Set(["707", "790", "792", "793", "794"]);
 function unseenHtml() {
-  const calls = getAllCalls();
+  const calls = countedCalls();
   if (!calls.length) return "";
   const seen = new Set(calls.map((c) => (c.code || "").toUpperCase()));
   const eh = CODE_GROUPS.find((g) => g.id === "eh");
@@ -2627,7 +2627,7 @@ function startQuiz() {
 
 // ---------- Jakson raportti (tulostettava) ----------
 function renderReport() {
-  const shifts = getShifts();
+  const shifts = countedShifts();
   const s = computeStats();
   const dates = shifts.map((x) => x.date).sort();
   const range = dates.length ? `${formatDate(dates[0])} – ${formatDate(dates[dates.length - 1])}` : "";
@@ -2706,7 +2706,7 @@ function weekDateRange(wk) {
   return `${fmt(monday)}–${fmt(sunday)}${year !== new Date().getFullYear() ? sunday.getUTCFullYear() : ""}`;
 }
 function renderWeekReport() {
-  const shifts = getShifts();
+  const shifts = countedShifts();
   const weeks = [...new Set(shifts.map((s) => isoWeekOf(s.date)))].sort().reverse();
   if (!weeks.length) {
     app.innerHTML = `<div class="no-print page-head"><a class="back" href="#tools">‹ Työkalut</a></div>
@@ -2862,8 +2862,8 @@ function openImageLightbox(src, alt) {
 
 // ---------- CV / Portfolio (tulostettava osaamisyhteenveto) ----------
 function renderPortfolio() {
-  const shifts = getShifts();
-  const allC = getAllCalls();
+  const shifts = countedShifts();
+  const allC = countedCalls();
   const s = computeStats();
   const settings = getSettings();
   const dates = shifts.map((x) => x.date).filter(Boolean).sort();
