@@ -21,11 +21,26 @@ export const DAYPARTS = [
 
 export const WEEKDAYS = ["Ma", "Ti", "Ke", "To", "Pe", "La", "Su"];
 
+// Vuoro lasketaan tilastoihin vasta kun se on alkanut: etukäteen kirjatut
+// tulevat vuorot eivät kasvata tunteja, vuoromäärää eivätkä jakson edistymistä.
+// Käynnissä oleva vuoro lasketaan heti alkuhetkestä.
+export function shiftStarted(s, now = new Date()) {
+  if (!s || !s.date) return false;
+  const t = /^\d{2}:\d{2}$/.test(s.startTime || "") ? s.startTime : (s.type === "night" ? "21:00" : "09:00");
+  return new Date(`${s.date}T${t}:00`) <= now;
+}
+export function countedShifts() {
+  return getShifts().filter((s) => shiftStarted(s));
+}
+export function countedCalls() {
+  return getAllCalls().filter((c) => shiftStarted(c.shift));
+}
+
 // filterFn: null = koko jakso, tai (date) => boolean rajaa vuorot/keikat.
 export function computeStats(filterFn = null) {
   const ok = (date) => !filterFn || filterFn(date || "");
-  const shifts = getShifts().filter((s) => ok(s.date));
-  const calls = getAllCalls().filter((c) => ok(c.shift?.date));
+  const shifts = countedShifts().filter((s) => ok(s.date));
+  const calls = countedCalls().filter((c) => ok(c.shift?.date));
 
   const byUrgency = { A: 0, B: 0, C: 0, D: 0, "": 0 };
   const byLead = {};
