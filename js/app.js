@@ -6,13 +6,13 @@ import {
 } from "./storage.js";
 import { CODE_GROUPS, CODE_MAP, ALL_CODES, URGENCY, PROCEDURES, X_SUBCODES } from "./codes.js";
 import { codeInfo } from "./codeinfo.js";
-import { computeStats, shiftHours, DAYPARTS, WEEKDAYS } from "./stats.js";
+import { computeStats, shiftHours, DAYPARTS, WEEKDAYS, effectiveUrgency } from "./stats.js";
 import { ekgWaveSvg } from "./ekgwave.js";
 import { STATIONS, stationLabel, ALL_UNITS, findStation, stationColor, DEFAULT_ACCENT, unitLevel } from "./stations.js";
 
 // ---------- Lista + oma syöte -valitsimet (asema / yksikkö) ----------
 // Sovelluksen versio – pidä samana kuin sw.js:n välimuistiversio.
-const APP_VERSION = "v67";
+const APP_VERSION = "v68";
 
 const CUSTOM = "__custom__";
 
@@ -103,8 +103,22 @@ const DISPOSITIONS = [
   ...X_OUTCOMES,
   "Muu",
 ];
-// Oma rooli toimenpiteissä (valvontataso)
-const ROLES = ["", "Suoritin itse", "Avustin", "Seurasin"];
+// Malmin aseman tavallisimmat kuljetuskohteet näkyvät keikkalomakkeessa
+// yhden napautuksen valintoina. Perään tulevat omista keikoista useimmin
+// käytetyt muut kohteet, jotta lista mukautuu siihen mitä oikeasti ajetaan.
+const BASE_DESTS = ["Malmi", "Meilahti", "SeHo"];
+function quickDestinations() {
+  const counts = {};
+  for (const c of getAllCalls()) {
+    if (c.destination) counts[c.destination] = (counts[c.destination] || 0) + 1;
+  }
+  const extra = Object.entries(counts)
+    .filter(([d, n]) => n >= 2 && !BASE_DESTS.some((b) => b.toLowerCase() === d.toLowerCase()))
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([d]) => d);
+  return [...BASE_DESTS, ...extra];
+}
 
 // Meilahden teho-osaston moduulit (valitaan, kun kohde on teho-osasto)
 const TEHO_MODULES = ["Moduuli AB", "Moduuli C", "Moduuli ED"];
@@ -251,7 +265,7 @@ function renderHome() {
       </div>
       <button class="btn primary" id="newShift">+ Vuoro</button>
     </header>
-    ${todayCardHtml(shifts)}
+    ${todayCardHtml(shifts) || startDayCardHtml()}
     <div class="seg view-seg">
       <button type="button" data-v="list" class="${homeView === "list" ? "on" : ""}">Lista</button>
       <button type="button" data-v="calendar" class="${homeView === "calendar" ? "on" : ""}">Kalenteri</button>
@@ -262,6 +276,14 @@ function renderHome() {
     <div id="home-body"></div>
   `;
   document.getElementById("newShift").onclick = () => openShiftForm();
+  const quickStart = document.getElementById("qs-day");
+  if (quickStart) {
+    quickStart.onclick = () => {
+      const created = addShift(newShiftDefaults());
+      haptic("tap");
+      location.hash = `#shift/${created.id}`;
+    };
+  }
   const curShift = shifts.find((x) => shiftCategory(x) === 0);
   if (curShift) {
     const tcOpen = document.getElementById("tc-open");
@@ -282,7 +304,7 @@ function renderHome() {
     document.getElementById("cal-prev").onclick = () => { calCursor.setMonth(calCursor.getMonth() - 1); renderHome(); };
     document.getElementById("cal-next").onclick = () => { calCursor.setMonth(calCursor.getMonth() + 1); renderHome(); };
     body.querySelectorAll("[data-shift]").forEach((el) => { el.onclick = () => { location.hash = `#shift/${el.dataset.shift}`; }; });
-    body.querySelectorAll("[data-newdate]").forEach((el) => { el.onclick = () => openShiftForm({ date: el.dataset.newdate, type: "day" }); });
+    body.querySelectorAll("[data-newdate]").forEach((el) => { el.onclick = () => openShiftForm(null, { date: el.dataset.newdate }); });
   }
 }
 
@@ -376,6 +398,24 @@ function todayCardHtml(shifts) {
     </div>`;
 }
 
+// Kun tälle päivälle ei ole vuoroa, etusivun kärjessä on yhden napautuksen
+// päivävuoron aloitus oletusasemalle. Tavallinen vuoro on päivävuoro, joten
+// sen ei pitäisi vaatia lomaketta.
+function startDayCardHtml() {
+  const d = newShiftDefaults();
+  const where = [d.station, d.unit].filter(Boolean).map(esc).join(" · ");
+  return `
+    <div class="today-card start-card" style="--sc:${stationColor(d.station) || "var(--primary)"}">
+      <div class="tc-top">
+        <span class="tc-live">Ei vuoroa tänään</span>
+        <span class="tc-type">Päivävuoro 9–21</span>
+      </div>
+      <div class="tc-sub">${where}${d.ht ? " · HT" : " · PT"}</div>
+      <button class="btn primary qs-btn" id="qs-day">Aloita päivävuoro</button>
+      <p class="qs-note">Muu vuoro tai päivä: <b>+ Vuoro</b> ylhäältä.</p>
+    </div>`;
+}
+
 // Muistuta varmuuskopiosta, kun dataa on kertynyt eikä kopiota ole otettu
 // kahteen viikkoon (tiedot ovat vain tämän selaimen muistissa).
 function backupReminderHtml(shifts) {
@@ -446,7 +486,7 @@ function shiftCard(s) {
       ? `<span class="pill night">Yö 21–9</span>`
       : `<span class="pill">${esc(s.startTime || "")}–${esc(s.endTime || "")}</span>`;
   const dots = calls.slice(0, 12).map((c) => {
-    const col = URGENCY[c.urgency]?.color || "#888";
+    const col = URGENCY[effectiveUrgency(c)]?.color || "#888";
     return `<span class="dot" style="background:${col}" title="${esc(c.code || "")}"></span>`;
   }).join("");
   const level = s.ht === false ? `<span class="pill pt">PT</span>` : `<span class="pill ht">HT</span>`;
@@ -468,15 +508,28 @@ function shiftCard(s) {
 }
 
 // ---------- Vuoron lisäys / muokkaus ----------
-function openShiftForm(existing) {
-  const settings = getSettings();
-  const s = existing || {
-    date: today(),
+// Harjoittelu on Malmin asemalla, joten se on oletus siihen asti, kunnes
+// asetuksissa valitaan jokin muu.
+const HOME_STATION = "Malmi (AS.50)";
+
+// Uuden vuoron oletukset: päivävuoro, oletusasema ja -yksikkö. Taso päätellään
+// yksiköstä (HE12xx = HT), muuten asetuksesta.
+function newShiftDefaults(date = today()) {
+  const st = getSettings();
+  const unit = st.defaultUnit || "";
+  const lvl = unitLevel(unit);
+  return {
+    date,
     type: "day",
-    unit: settings.defaultUnit || "",
-    station: settings.defaultStation || "",
-    ht: settings.defaultHt !== false,
+    station: st.defaultStation || HOME_STATION,
+    unit,
+    ht: lvl !== null ? lvl : st.defaultHt !== false,
   };
+}
+
+// existing = muokattava vuoro; preset = uuden vuoron esitäytöt (esim. kalenterin päivä).
+function openShiftForm(existing, preset = {}) {
+  const s = existing || { ...newShiftDefaults(), ...preset };
   const isDay = s.type === "day", isNight = s.type === "night";
   const isCustom = !isDay && !isNight;
   const isHt = s.ht !== false;
@@ -626,13 +679,6 @@ function renderShiftDetail(id) {
   });
 }
 
-// Tehtävän "teema-aste": jos tehtävällä on lopputulos kuljetuskoodilla/-asteella,
-// käytä kuljetuksen (lopputuloksen) hälytysastetta; muuten alkuperäistä hälytyskoodin astetta.
-function effectiveUrgency(c) {
-  if (c.disposition === "Kuljetettu" && c.transportUrgency) return c.transportUrgency;
-  return c.urgency || "";
-}
-
 function callRow(shiftId, c) {
   const eu = effectiveUrgency(c);
   const u = URGENCY[eu];
@@ -649,31 +695,16 @@ function callRow(shiftId, c) {
           ${c.time ? `<span class="time">${esc(c.time)}</span>` : ""}
         </div>
         ${c.description ? `<div class="call-desc">${esc(c.description)}</div>` : ""}
-        ${vitalsLine(c.vitals)}
         <div class="call-meta">
           ${c.disposition ? `<span class="meta-pill">${esc(dispositionShort(c))}</span>` : `<span class="meta-pill kesken">Kesken</span>`}
           ${c.destination ? `<span class="meta-pill dest">${esc(c.destination)}${c.tehoModule ? " · " + esc(c.tehoModule) : ""}</span>` : ""}
           ${c.disposition === "Kuljetettu" && c.transportCode ? `<span class="meta-pill">Kulj. ${esc(c.transportCode)}${c.transportUrgency ? " " + esc(c.transportUrgency) : ""}</span>` : ""}
           ${(c.tags || []).map((t) => `<span class="meta-pill tag">${esc(t)}</span>`).join("")}
-          ${c.role ? `<span class="meta-pill role">${esc(c.role)}</span>` : ""}
           ${(c.photos || []).length ? `<span class="meta-pill">📷 ${c.photos.length}</span>` : ""}
         </div>
       </div>
       <button class="dup-btn" data-dup="${c.id}" title="Kopioi keikka">⧉</button>
     </div>`;
-}
-
-function vitalsLine(v) {
-  if (!v) return "";
-  const parts = [];
-  if (v.rr) parts.push(`RR ${esc(v.rr)}`);
-  if (v.hr) parts.push(`P ${esc(v.hr)}`);
-  if (v.spo2) parts.push(`SpO₂ ${esc(v.spo2)}`);
-  if (v.gcs) parts.push(`GCS ${esc(v.gcs)}`);
-  if (v.ht) parts.push(`HT ${esc(v.ht)}`);
-  if (v.gluk) parts.push(`Gluk ${esc(v.gluk)}`);
-  if (v.temp) parts.push(`T ${esc(v.temp)}°`);
-  return parts.length ? `<div class="vitals-line">${parts.join(" · ")}</div>` : "";
 }
 
 // ---------- Vuoron yhteenveto (tulostettava) ----------
@@ -689,7 +720,8 @@ function renderShiftSummary(id) {
   let transported = 0;
   const tagCount = {};
   for (const c of calls) {
-    if (urg[c.urgency] != null) urg[c.urgency]++;
+    const eu = effectiveUrgency(c);
+    if (urg[eu] != null) urg[eu]++;
     if (c.disposition === "Kuljetettu") transported++;
     for (const t of c.tags || []) tagCount[t] = (tagCount[t] || 0) + 1;
   }
@@ -718,18 +750,16 @@ function renderShiftSummary(id) {
 
       <table class="pv-table">
         <thead>
-          <tr><th>Aika</th><th>Aste</th><th>Koodi</th><th>Tehtävä</th><th>Kuvaus</th><th>Peruselintoiminnot</th><th>Kuljetus</th></tr>
+          <tr><th>Aika</th><th>Aste</th><th>Koodi</th><th>Tehtävä</th><th>Kuvaus</th><th>Kuljetus</th></tr>
         </thead>
         <tbody>
           ${calls.length ? calls.map((c) => {
-            const v = c.vitals;
-            const vs = v ? [v.rr && "RR " + v.rr, v.hr && "P " + v.hr, v.spo2 && "SpO₂ " + v.spo2, v.gcs && "GCS " + v.gcs, v.ht && "HT " + v.ht, v.gluk && "Gluk " + v.gluk, v.temp && "T " + v.temp].filter(Boolean).join(", ") : "";
             const destLabel = c.destination ? (c.tehoModule ? `${c.destination} (${c.tehoModule})` : c.destination) : "";
             let disp = c.disposition ? [dispositionShort(c), destLabel].filter(Boolean).join(": ") : "Kesken";
             if (c.disposition === "Kuljetettu" && c.transportCode) {
               disp += ` (${c.transportCode}${c.transportUrgency ? " " + c.transportUrgency : ""})`;
             }
-            const tagsLine = (c.tags || []).length ? `<div class="pv-rowtags">${(c.tags || []).map(esc).join(", ")}${c.role ? ` — ${esc(c.role)}` : ""}</div>` : (c.role ? `<div class="pv-rowtags">${esc(c.role)}</div>` : "");
+            const tagsLine = (c.tags || []).length ? `<div class="pv-rowtags">${(c.tags || []).map(esc).join(", ")}</div>` : "";
             const refl = c.reflection ? `<div class="pv-rowrefl">💡 ${esc(c.reflection)}</div>` : "";
             return `<tr>
               <td>${esc(c.time || "")}</td>
@@ -737,10 +767,9 @@ function renderShiftSummary(id) {
               <td>${esc(c.code || "")}</td>
               <td>${esc(c.codeName || "")}</td>
               <td>${esc(c.description || "")}${tagsLine}${refl}</td>
-              <td>${esc(vs)}</td>
               <td>${esc(disp)}</td>
             </tr>`;
-          }).join("") : `<tr><td colspan="7" class="muted">Ei keikkoja.</td></tr>`}
+          }).join("") : `<tr><td colspan="6" class="muted">Ei keikkoja.</td></tr>`}
         </tbody>
       </table>
 
@@ -760,6 +789,11 @@ function openCallForm(shiftId, existing) {
   // Sisäänrakennetut toimenpiteet + käyttäjän omat tagit
   const allTags = [...new Set([...PROCEDURES, ...(settings.tags || [])])];
   const isX = (c.disposition || "").startsWith("X-");
+  const quickDests = quickDestinations();
+  // Ehdotuslista: omat kohteet + pikavalinnat (SeHo näkyy myös vanhoille
+  // asennuksille, joiden tallennettu kohdelista on tehty ennen sitä).
+  const destOptions = [...new Set([...BASE_DESTS, ...settings.destinations])];
+  const isQuickOn = (d) => c.disposition === "Kuljetettu" && (c.destination || "").toLowerCase() === d.toLowerCase();
   openModal(existing ? "Muokkaa keikkaa" : "Uusi keikka", `
     <div class="row">
       <label>Kellonaika<input type="time" id="c-time" value="${esc(c.time || "")}"></label>
@@ -785,6 +819,11 @@ function openCallForm(shiftId, existing) {
       <div class="tips" id="c-tips">${tipsHtml(tipsFor(c.description))}</div>
     </label>
     <label>Lopputulos / kuljetus
+      <span class="dq-cap">Kuljetettu kohteeseen</span>
+      <div class="dest-quick" id="c-qdest">
+        ${quickDests.map((d) => `<button type="button" class="dq ${isQuickOn(d) ? "on" : ""}" data-dest="${esc(d)}">${esc(d)}</button>`).join("")}
+      </div>
+      <span class="dq-cap">tai valitse muu lopputulos</span>
       <select id="c-disp">
         <option value="" ${!c.disposition ? "selected" : ""}>— Kesken (täydennä myöhemmin)</option>
         ${DISPOSITIONS.map((d) => `<option ${c.disposition === d ? "selected" : ""}>${esc(d)}</option>`).join("")}
@@ -799,7 +838,7 @@ function openCallForm(shiftId, existing) {
       <label>Kuljetuskohde
         <input type="text" id="c-dest" list="destlist" value="${esc(c.destination || "")}" placeholder="esim. Meilahti">
         <datalist id="destlist">
-          ${settings.destinations.map((d) => `<option value="${esc(d)}">`).join("")}
+          ${destOptions.map((d) => `<option value="${esc(d)}">`).join("")}
         </datalist>
       </label>
       <div id="c-tehowrap" style="${isTeho(c.destination) ? "" : "display:none"}">
@@ -826,22 +865,6 @@ function openCallForm(shiftId, existing) {
       </div>
       <input type="text" id="c-tagextra" placeholder="Muu, lisää pilkulla eroteltuna" value="${esc((c.tags || []).filter((t) => !allTags.includes(t)).join(", "))}">
     </label>
-    <label>Oma rooli toimenpiteissä
-      <div class="seg" id="c-role">
-        ${ROLES.map((r) => `<button type="button" data-r="${esc(r)}" class="${(c.role || "") === r ? "on" : ""}">${esc(r || "–")}</button>`).join("")}
-      </div>
-    </label>
-    <label>Peruselintoiminnot (vapaaehtoinen)
-      <div class="vitals">
-        <span><small>RR</small><input type="text" id="v-rr" inputmode="numeric" value="${esc(c.vitals?.rr || "")}" placeholder="120/80"></span>
-        <span><small>Pulssi</small><input type="text" id="v-hr" inputmode="numeric" value="${esc(c.vitals?.hr || "")}" placeholder="72"></span>
-        <span><small>SpO₂</small><input type="text" id="v-spo2" inputmode="numeric" value="${esc(c.vitals?.spo2 || "")}" placeholder="98%"></span>
-        <span><small>GCS</small><input type="text" id="v-gcs" inputmode="numeric" value="${esc(c.vitals?.gcs || "")}" placeholder="15"></span>
-        <span><small>HT</small><input type="text" id="v-ht" inputmode="numeric" value="${esc(c.vitals?.ht || "")}" placeholder="16"></span>
-        <span><small>B-gluk</small><input type="text" id="v-gluk" inputmode="decimal" value="${esc(c.vitals?.gluk || "")}" placeholder="5.6"></span>
-        <span><small>Lämpö</small><input type="text" id="v-temp" inputmode="decimal" value="${esc(c.vitals?.temp || "")}" placeholder="36.8"></span>
-      </div>
-    </label>
     <label>Reflektio – mitä opin
       <textarea id="c-reflect" rows="2" placeholder="Lyhyt oppi tästä keikasta">${esc(c.reflection || "")}</textarea>
     </label>
@@ -856,8 +879,6 @@ function openCallForm(shiftId, existing) {
       const urgency = document.querySelector("#c-urg .on")?.dataset.u || "";
       const chipTags = [...document.querySelectorAll("#c-tags .chip.on")].map((b) => b.dataset.tag);
       const extraTags = splitList(val("c-tagextra"));
-      const vitals = { rr: val("v-rr"), hr: val("v-hr"), spo2: val("v-spo2"), gcs: val("v-gcs"), ht: val("v-ht"), gluk: val("v-gluk"), temp: val("v-temp") };
-      const hasVitals = Object.values(vitals).some((v) => v.trim());
       const disposition = val("c-disp");
       const transported = disposition === "Kuljetettu";
       const xSub = disposition.startsWith("X-") ? val("c-xsub") : "";
@@ -879,9 +900,7 @@ function openCallForm(shiftId, existing) {
         transportCodeName: CODE_MAP.get(transportCode)?.name || "",
         transportUrgency,
         tags: [...new Set([...chipTags, ...extraTags])],
-        role: document.querySelector("#c-role .on")?.dataset.r || "",
         reflection: val("c-reflect"),
-        vitals: hasVitals ? vitals : null,
         photos: photos.length ? photos : null,
       };
       if (existing) updateCall(shiftId, existing.id, patch);
@@ -950,26 +969,44 @@ function openCallForm(shiftId, existing) {
   descEl.addEventListener("input", () => {
     document.getElementById("c-tips").innerHTML = tipsHtml(tipsFor(descEl.value));
   });
-  document.getElementById("c-disp").onchange = (e) => {
-    const v = e.target.value;
+  const dispEl = document.getElementById("c-disp");
+  const destEl = document.getElementById("c-dest");
+  // Pikavalinta on päällä vain, kun lopputulos on kuljetus juuri siihen kohteeseen
+  // – myös silloin, kun kohde on kirjoitettu käsin.
+  const markQuickDest = () => {
+    const dest = destEl.value.trim().toLowerCase();
+    document.querySelectorAll("#c-qdest .dq").forEach((b) =>
+      b.classList.toggle("on", dispEl.value === "Kuljetettu" && b.dataset.dest.toLowerCase() === dest));
+  };
+  const applyDisposition = () => {
+    const v = dispEl.value;
     document.getElementById("c-destwrap").style.display = v === "Kuljetettu" ? "" : "none";
     const xwrap = document.getElementById("c-xwrap");
     const isXnow = v.startsWith("X-");
     xwrap.style.display = isXnow ? "" : "none";
     if (isXnow) document.getElementById("c-xsub").innerHTML = xSubOptions(v, "");
+    markQuickDest();
   };
-  const destEl = document.getElementById("c-dest");
-  destEl.addEventListener("input", () => {
+  dispEl.onchange = applyDisposition;
+  const applyDest = () => {
     document.getElementById("c-tehowrap").style.display = isTeho(destEl.value) ? "" : "none";
+    markQuickDest();
+  };
+  destEl.addEventListener("input", applyDest);
+  // Yksi napautus: lopputulos = kuljetettu ja kohde valittu.
+  document.querySelectorAll("#c-qdest .dq").forEach((b) => {
+    b.onclick = () => {
+      dispEl.value = "Kuljetettu";
+      destEl.value = b.dataset.dest;
+      applyDisposition();
+      applyDest();
+    };
   });
   document.querySelectorAll("#c-teho button").forEach((b) => {
     b.onclick = () => document.querySelectorAll("#c-teho button").forEach((x) => x.classList.toggle("on", x === b));
   });
   document.querySelectorAll("#c-tags .chip").forEach((b) => {
     b.onclick = () => b.classList.toggle("on");
-  });
-  document.querySelectorAll("#c-role button").forEach((b) => {
-    b.onclick = () => document.querySelectorAll("#c-role button").forEach((x) => x.classList.toggle("on", x === b));
   });
   // Kuvaliitteet
   const photosEl = document.getElementById("c-photos");
@@ -1267,7 +1304,7 @@ function renderCalls() {
   const f = callFilter;
   let filtered = calls.filter((c) => {
     if (f.incomplete && c.disposition) return false;
-    if (f.urgency && c.urgency !== f.urgency) return false;
+    if (f.urgency && effectiveUrgency(c) !== f.urgency) return false;
     if (f.lead && (c.lead || CODE_MAP.get(c.code)?.lead) !== f.lead) return false;
     if (f.q) {
       const hay = `${c.code} ${c.codeName} ${c.description} ${c.destination}`.toLowerCase();
@@ -1400,14 +1437,15 @@ function renderStats() {
     </div>
 
     <h2 class="block-h">🌗 Vuorokaudenaika × kiireellisyys</h2>
-    <p class="muted small">Mihin aikaan tulee minkä kiireellisyyden ja tyyppisiä hälytyksiä.</p>
+    <p class="muted small">Mihin aikaan tulee minkä kiireellisyyden ja tyyppisiä tehtäviä. Kuljetetuilla potilailla kiireellisyys on kuljetuksen kiireellisyys.</p>
     <div class="card">${daypartHtml(s.dayparts)}</div>
 
     <h2 class="block-h">📅 Viikonpäivät</h2>
     <div class="card chart-card">${weekdayHtml(s.weekdayHist)}</div>
 
+    ${s.shiftTypeCount.night ? `
     <h2 class="block-h">☀️ Päivä- vs. 🌙 yövuoro</h2>
-    <div class="cmp-grid">${shiftTypeHtml(s)}</div>
+    <div class="cmp-grid">${shiftTypeHtml(s)}</div>` : ""}
 
     <h2 class="block-h">🚑 Kuljetus</h2>
     <div class="ring-wrap">
@@ -1418,7 +1456,8 @@ function renderStats() {
       </div>
     </div>
 
-    <h2 class="block-h">🎯 Hälytysasteet</h2>
+    <h2 class="block-h">🎯 Kiireellisyys</h2>
+    <p class="muted small">Kuljetetuilla kuljetuksen kiireellisyys, muilla hälytysaste.</p>
     <div class="card">${donutHtml(urgSegments, { center: s.callCount, sub: "keikkaa" })}</div>
 
     <h2 class="block-h">🛡️ Johtovastuu</h2>
@@ -1590,7 +1629,6 @@ function computeAchievements(s) {
   const deck = getEkgDeck();
   const ekg = ekgMastered(deck);
   const reflections = calls.filter((c) => (c.reflection || "").trim()).length;
-  const itseCount = calls.filter((c) => c.role === "Suoritin itse").length;
   const hasNight = shifts.some((x) => x.type === "night");
   const hasA = calls.some((c) => c.urgency === "A");
   const allUrg = ["A", "B", "C", "D"].every((u) => calls.some((c) => c.urgency === u));
@@ -1611,7 +1649,6 @@ function computeAchievements(s) {
     { icon: "📚", title: "25 eri koodia", desc: "Laaja kokemus tehtävätyypeistä", ...prog(s.distinctCodes, 25) },
     { icon: "↩️", title: "X-tehtävä", desc: "Ensimmäinen ei-kuljetus (X-koodi)", ...prog(hasX ? 1 : 0, 1) },
     { icon: "✍️", title: "Reflektoija", desc: "10 keikkareflektiota kirjoitettu", ...prog(reflections, 10) },
-    { icon: "🙋", title: "Omin käsin", desc: "10 toimenpidettä itse suorittaen", ...prog(itseCount, 10) },
     { icon: "📈", title: "Rytmit haltuun", desc: "5 EKG-rytmiä hallussa", ...prog(ekg, 5) },
     { icon: "🫀", title: "EKG-mestari", desc: `Kaikki ${deck.length} rytmiä hallussa`, ...prog(ekg, deck.length) },
   ];
@@ -1839,12 +1876,11 @@ function goalsSectionHtml(s) {
   const goals = getSettings().goals || [];
   if (!goals.length) return "";
   const rows = goals.map((g) => {
-    const ts = s.tagStats[g.tag] || { total: 0, itse: 0 };
-    const done = ts.total;
+    const done = s.byTag[g.tag] || 0;
     const pct = Math.min(100, Math.round((done / g.target) * 100));
     const reached = done >= g.target;
     return `<div class="goal">
-      <div class="goal-top"><span class="goal-name">${esc(g.tag)}</span><span class="goal-num ${reached ? "done" : ""}">${done} / ${g.target}${ts.itse ? ` · ${ts.itse} itse` : ""}</span></div>
+      <div class="goal-top"><span class="goal-name">${esc(g.tag)}</span><span class="goal-num ${reached ? "done" : ""}">${done} / ${g.target}</span></div>
       <div class="bartrack"><div class="barfill" style="width:${pct}%;background:${reached ? "var(--primary)" : "var(--primary)"}"></div></div>
     </div>`;
   }).join("");
@@ -2441,8 +2477,8 @@ function renderReport() {
       </div>
 
       ${goals.length ? `<h2>Osaamistavoitteet</h2>
-      <table class="pv-table"><thead><tr><th>Toimenpide</th><th>Tehty</th><th>Itse</th><th>Tavoite</th></tr></thead><tbody>
-        ${goals.map((g) => { const ts = s.tagStats[g.tag] || { total: 0, itse: 0 }; return `<tr><td>${esc(g.tag)}</td><td>${ts.total}</td><td>${ts.itse}</td><td>${g.target}</td></tr>`; }).join("")}
+      <table class="pv-table"><thead><tr><th>Toimenpide</th><th>Tehty</th><th>Tavoite</th></tr></thead><tbody>
+        ${goals.map((g) => `<tr><td>${esc(g.tag)}</td><td>${s.byTag[g.tag] || 0}</td><td>${g.target}</td></tr>`).join("")}
       </tbody></table>` : ""}
 
       <h2>Toimenpiteet ja tapaukset</h2>
@@ -2506,14 +2542,15 @@ function renderWeekReport() {
   for (const s of wkShifts) for (const c of s.calls || []) calls.push({ ...c, shift: s });
   const hours = Math.round(wkShifts.reduce((sum, s) => sum + shiftHours(s), 0) * 10) / 10;
   const urg = { A: 0, B: 0, C: 0, D: 0 };
-  const byCode = {}, byTag = {}, tagItse = {};
+  const byCode = {}, byTag = {};
   let transported = 0;
   const reflections = [];
   for (const c of calls) {
-    if (urg[c.urgency] != null) urg[c.urgency]++;
+    const eu = effectiveUrgency(c);
+    if (urg[eu] != null) urg[eu]++;
     if (c.code) byCode[c.code] = (byCode[c.code] || 0) + 1;
     if (c.disposition === "Kuljetettu") transported++;
-    for (const t of c.tags || []) { byTag[t] = (byTag[t] || 0) + 1; if (c.role === "Suoritin itse") tagItse[t] = (tagItse[t] || 0) + 1; }
+    for (const t of c.tags || []) byTag[t] = (byTag[t] || 0) + 1;
     if (c.reflection) reflections.push({ date: c.shift.date, code: c.code, text: c.reflection });
   }
   for (const s of wkShifts) if (s.notes) reflections.push({ date: s.date, code: "", text: s.notes, shift: true });
@@ -2549,8 +2586,8 @@ function renderWeekReport() {
       </tbody></table>
 
       ${topTags.length ? `<h2>Toimenpiteet ja tapaukset</h2>
-      <table class="pv-table"><thead><tr><th>Toimenpide</th><th>Kpl</th><th>Itse</th></tr></thead><tbody>
-        ${topTags.map(([t, n]) => `<tr><td>${esc(t)}</td><td>${n}</td><td>${tagItse[t] || 0}</td></tr>`).join("")}
+      <table class="pv-table"><thead><tr><th>Toimenpide</th><th>Kpl</th></tr></thead><tbody>
+        ${topTags.map(([t, n]) => `<tr><td>${esc(t)}</td><td>${n}</td></tr>`).join("")}
       </tbody></table>` : ""}
 
       ${topCodes.length ? `<h2>Tehtäväkoodit</h2>
@@ -2659,7 +2696,8 @@ function renderPortfolio() {
   let transported = 0;
   const tagCount = {}, codeCount = {}, stationSet = new Set();
   for (const c of allC) {
-    if (urg[c.urgency] != null) urg[c.urgency]++;
+    const eu = effectiveUrgency(c);
+    if (urg[eu] != null) urg[eu]++;
     if (c.disposition === "Kuljetettu") transported++;
     for (const t of c.tags || []) tagCount[t] = (tagCount[t] || 0) + 1;
     if (c.code) codeCount[c.code] = (codeCount[c.code] || 0) + 1;
@@ -2881,8 +2919,32 @@ function openEkgCardForm() {
 // ---------- Asetukset ----------
 function renderSettings() {
   const st = getSettings();
+  // Näytä se asema, jota uudet vuorot oikeasti käyttävät.
+  const defStation = st.defaultStation || HOME_STATION;
   app.innerHTML = `
-    <header class="page-head"><h1>Asetukset</h1></header>
+    <header class="page-head">
+      <div>
+        <h1>Asetukset</h1>
+        <p class="sub">Muutokset tallentuvat automaattisesti.</p>
+      </div>
+    </header>
+
+    <section class="settings-block">
+      <h2>Vuoron oletukset</h2>
+      <p class="muted">Esitäytetään uuteen vuoroon ja etusivun <b>Aloita päivävuoro</b> -napille.</p>
+      <label class="field">Oletusasema
+        ${stationComboHtml("set-defstation", defStation)}
+      </label>
+      <label class="field">Oletusyksikkö
+        ${unitComboHtml("set-defunit", st.defaultUnit, findStation(defStation)?.units)}
+      </label>
+      <label class="field">Oletustaso
+        <select id="set-defht">
+          <option value="1" ${st.defaultHt !== false ? "selected" : ""}>Hoitotaso (HT)</option>
+          <option value="0" ${st.defaultHt === false ? "selected" : ""}>Perustaso (PT)</option>
+        </select>
+      </label>
+    </section>
 
     <section class="settings-block">
       <h2>Teema</h2>
@@ -2926,24 +2988,6 @@ function renderSettings() {
       <h2>Osaamistavoitteet</h2>
       <p class="muted">Yksi per rivi muodossa <b>Toimenpide : määrä</b>. Edistyminen näkyy Tilastot-välilehdellä. Esim. "Intubaatio : 5".</p>
       <textarea id="set-goals" rows="4" placeholder="Intubaatio : 5&#10;Kardioversio : 3&#10;Synnytys : 1">${esc((st.goals || []).map((g) => `${g.tag} : ${g.target}`).join("\n"))}</textarea>
-    </section>
-
-    <section class="settings-block">
-      <h2>Vuoron oletukset</h2>
-      <p class="muted">Esitäytetään automaattisesti uuteen vuoroon.</p>
-      <label class="field">Oletusasema
-        ${stationComboHtml("set-defstation", st.defaultStation)}
-      </label>
-      <label class="field">Oletusyksikkö
-        ${unitComboHtml("set-defunit", st.defaultUnit, findStation(st.defaultStation)?.units)}
-      </label>
-      <label class="field">Oletustaso
-        <select id="set-defht">
-          <option value="1" ${st.defaultHt !== false ? "selected" : ""}>Hoitotaso (HT)</option>
-          <option value="0" ${st.defaultHt === false ? "selected" : ""}>Perustaso (PT)</option>
-        </select>
-      </label>
-      <button class="btn primary" id="saveSettings">Tallenna asetukset</button>
     </section>
 
     <section class="settings-block">
@@ -3009,7 +3053,11 @@ function renderSettings() {
       toast("Teema vaihdettu");
     };
   });
-  document.getElementById("saveSettings").onclick = () => {
+  // Automaattinen tallennus: aiemmin yksi Tallenna-nappi sivun keskellä tallensi
+  // myös ylempien osioiden muutokset, ja sen ohittaminen hukkasi ne hiljaa.
+  // change laukeaa tekstikentistä vasta kun kentästä poistutaan, joten
+  // kirjoittaminen ei tallenna jokaista merkkiä erikseen.
+  const saveSettings = () => {
     updateSettings({
       destinations: splitList(val("set-dest")),
       tags: splitList(val("set-tags")),
@@ -3023,8 +3071,14 @@ function renderSettings() {
       defaultHt: val("set-defht") === "1",
     });
     applyAccent();
-    toast("Asetukset tallennettu");
+    toast("Tallennettu");
   };
+  const autosaveIds = ["set-dest", "set-tags", "set-goals", "set-istart", "set-iend", "set-thours",
+    "set-tshifts", "set-defstation", "set-defstation-custom", "set-defunit", "set-defunit-custom", "set-defht"];
+  for (const id of autosaveIds) {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("change", saveSettings);
+  }
   document.getElementById("expJson").onclick = () => {
     updateSettings({ lastBackup: today() });
     shareOrDownload(backupFilename(), exportJSON(), "application/json");

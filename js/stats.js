@@ -2,6 +2,15 @@
 import { getShifts, getAllCalls } from "./storage.js";
 import { CODE_MAP } from "./codes.js";
 
+// Tilastoissa ratkaisee kuljetuksen kiireellisyys: se kertoo potilaan todellisen
+// tilan paremmin kuin hätäkeskuksen hälytysaste. Kun potilasta ei kuljetettu
+// (X-koodit, kesken), käytetään hälytysastetta. Hälytys → kuljetus -vertailu
+// lukee molemmat erikseen.
+export function effectiveUrgency(c) {
+  if (c.disposition === "Kuljetettu" && c.transportUrgency) return c.transportUrgency;
+  return c.urgency || "";
+}
+
 // Vuorokaudenajat (tunnit 0–23).
 export const DAYPARTS = [
   { key: "yo", label: "Yö", short: "00–06", from: 0, to: 6 },
@@ -23,7 +32,6 @@ export function computeStats(filterFn = null) {
   const byCode = {};
   const byDest = {};
   const byTag = {};
-  const tagStats = {}; // tag -> { total, itse } (rooli "Suoritin itse")
   let transported = 0;
 
   // Aika-analyysi
@@ -55,16 +63,12 @@ export function computeStats(filterFn = null) {
   const urgTransitions = {};
 
   for (const c of calls) {
-    byUrgency[c.urgency || ""] = (byUrgency[c.urgency || ""] || 0) + 1;
+    const eu = effectiveUrgency(c);
+    byUrgency[eu] = (byUrgency[eu] || 0) + 1;
     const lead = c.lead || (CODE_MAP.get(c.code)?.lead) || "Muu";
     byLead[lead] = (byLead[lead] || 0) + 1;
     if (c.code) byCode[c.code] = (byCode[c.code] || 0) + 1;
-    for (const t of c.tags || []) {
-      byTag[t] = (byTag[t] || 0) + 1;
-      const ts = tagStats[t] || (tagStats[t] = { total: 0, itse: 0 });
-      ts.total++;
-      if (c.role === "Suoritin itse") ts.itse++;
-    }
+    for (const t of c.tags || []) byTag[t] = (byTag[t] || 0) + 1;
 
     // Aika-analyysi
     const hour = parseHour(c.time);
@@ -74,7 +78,7 @@ export function computeStats(filterFn = null) {
       const bucket = bucketFor(hour);
       if (bucket) {
         bucket.total++;
-        if (c.urgency && bucket.urg[c.urgency] != null) bucket.urg[c.urgency]++;
+        if (eu && bucket.urg[eu] != null) bucket.urg[eu]++;
         if (c.code) bucket.byCode[c.code] = (bucket.byCode[c.code] || 0) + 1;
       }
     }
@@ -90,7 +94,7 @@ export function computeStats(filterFn = null) {
       const st = stype(c.shift);
       shiftTypeCalls[st]++;
       if (c.disposition === "Kuljetettu") shiftTypeTransported[st]++;
-      if (c.urgency && shiftTypeUrg[st][c.urgency] != null) shiftTypeUrg[st][c.urgency]++;
+      if (eu && shiftTypeUrg[st][eu] != null) shiftTypeUrg[st][eu]++;
     }
 
     if (c.disposition === "Kuljetettu") {
@@ -159,7 +163,7 @@ export function computeStats(filterFn = null) {
 
   return {
     topTags,
-    tagStats,
+    byTag,
     compare: {
       total: cmpTotal, urgSame, urgChanged, urgDown, urgUp, codeChanged,
       changeRate: cmpTotal ? Math.round((urgChanged / cmpTotal) * 100) : 0,
