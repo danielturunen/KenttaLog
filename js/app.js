@@ -12,7 +12,7 @@ import { STATIONS, stationLabel, ALL_UNITS, findStation, stationColor, DEFAULT_A
 
 // ---------- Lista + oma syöte -valitsimet (asema / yksikkö) ----------
 // Sovelluksen versio – pidä samana kuin sw.js:n välimuistiversio.
-const APP_VERSION = "v70";
+const APP_VERSION = "v71";
 
 const CUSTOM = "__custom__";
 
@@ -122,6 +122,15 @@ function quickDestinations() {
     .map(([d]) => d);
   return [...base, ...extra];
 }
+
+// Potilaan ikäryhmä ilman tunnistetietoja. Rajat kuten Fisdapissa:
+// lapsi alle 18 v, iäkäs 65 v ja yli.
+const AGE_GROUPS = [
+  { id: "lapsi", label: "Lapsi", hint: "alle 18 v" },
+  { id: "aikuinen", label: "Aikuinen", hint: "18–64 v" },
+  { id: "iakas", label: "Iäkäs", hint: "65 v +" },
+];
+const AGE_LABEL = Object.fromEntries(AGE_GROUPS.map((a) => [a.id, a.label]));
 
 // Meilahden teho-osaston moduulit (valitaan, kun kohde on teho-osasto)
 const TEHO_MODULES = ["Moduuli AB", "Moduuli C", "Moduuli ED"];
@@ -268,6 +277,7 @@ function renderHome() {
       </div>
       <button class="btn primary" id="newShift">+ Vuoro</button>
     </header>
+    ${reflectCardHtml(shifts)}
     ${todayCardHtml(shifts) || startDayCardHtml()}
     <div class="seg view-seg">
       <button type="button" data-v="list" class="${homeView === "list" ? "on" : ""}">Lista</button>
@@ -279,6 +289,7 @@ function renderHome() {
     <div id="home-body"></div>
   `;
   document.getElementById("newShift").onclick = () => openShiftForm();
+  wireReflectCard();
   const qsStation = document.getElementById("qs-station");
   if (qsStation) qsStation.onclick = () => openStationPicker();
   const quickStart = document.getElementById("qs-day");
@@ -402,6 +413,70 @@ function todayCardHtml(shifts) {
         </span>
       </div>
     </div>`;
+}
+
+// Vuoron loppuhetki (päivä 21:00, yö seuraavana aamuna 09:00, muu oma loppuaika).
+function shiftEndDate(s) {
+  const startMin = shiftStartMin(s);
+  const [h, m] = (s.endTime || (s.type === "night" ? "09:00" : "21:00")).split(":").map(Number);
+  let endMin = h * 60 + m;
+  if (endMin <= startMin) endMin += 24 * 60;
+  const d = new Date(s.date + "T00:00:00");
+  d.setMinutes(endMin);
+  return d;
+}
+
+// Päivän oppi: kun vuoro on päättynyt eikä sille ole kirjoitettu mitään,
+// etusivu kysyy yhden asian. Ilmoitukset eivät toimi iPhonen kotivalikko-
+// sovelluksessa ilman palvelinta, joten kysymys tulee seuraavalla avauksella.
+// Vain kolmen päivän sisällä päättyneet: vanhempaa ei enää muista tarkasti.
+function pendingReflectShift(shifts) {
+  const now = new Date();
+  return shifts
+    .filter((s) => (s.calls || []).length && !(s.notes || "").trim() && !s.reflectAsked)
+    .map((s) => ({ s, end: shiftEndDate(s) }))
+    .filter(({ end }) => end <= now && now - end < 3 * 86400000)
+    .sort((a, b) => b.end - a.end)[0]?.s || null;
+}
+function reflectCardHtml(shifts) {
+  const s = pendingReflectShift(shifts);
+  if (!s) return "";
+  const calls = (s.calls || []).slice().sort((a, b) => callShiftMinute(s, a) - callShiftMinute(s, b));
+  // Muistin tueksi päivän tehtävät, sama koodi kertaalleen lukumäärällä.
+  const byCode = new Map();
+  for (const c of calls) byCode.set(c.code || "?", (byCode.get(c.code || "?") || 0) + 1);
+  const codes = [...byCode].map(([code, n]) => {
+    const name = CODE_MAP.get(code)?.name || "";
+    return `<span class="rc-code"><b>${esc(code)}</b>${name ? " " + esc(name) : ""}${n > 1 ? ` ×${n}` : ""}</span>`;
+  }).join("");
+  return `
+    <div class="reflect-card" data-rshift="${s.id}">
+      <div class="rc-top">${shiftTypeName(s)} päättyi · ${formatDate(s.date)} · ${calls.length} keikkaa</div>
+      <h3>Mikä oli päivän tärkein oppi?</h3>
+      <div class="rc-codes">${codes}</div>
+      <textarea id="rc-text" rows="3" placeholder="Yksi asia riittää. Tallentuu vuoron oppimispäiväkirjaan."></textarea>
+      <div class="rc-actions">
+        <button type="button" class="btn ghost" id="rc-skip">Ohita</button>
+        <button type="button" class="btn primary" id="rc-save">Tallenna</button>
+      </div>
+    </div>`;
+}
+function wireReflectCard() {
+  const card = document.querySelector(".reflect-card");
+  if (!card) return;
+  const id = card.dataset.rshift;
+  document.getElementById("rc-save").onclick = () => {
+    const text = val("rc-text").trim();
+    if (!text) { document.getElementById("rc-text").focus(); return; }
+    updateShift(id, { notes: text });
+    haptic("ok");
+    toast("Tallennettu oppimispäiväkirjaan");
+    renderHome();
+  };
+  document.getElementById("rc-skip").onclick = () => {
+    updateShift(id, { reflectAsked: true });
+    renderHome();
+  };
 }
 
 // Kun tälle päivälle ei ole vuoroa, etusivun kärjessä on yhden napautuksen
@@ -691,7 +766,8 @@ function renderShiftDetail(id) {
       const src = (s.calls || []).find((c) => c.id === b.dataset.dup);
       if (!src) return;
       const { id, ...rest } = src;
-      const dup = { ...rest, time: nowTime(), description: "", reflection: "", photos: null };
+      // Kopio pitää tehtävän tiedot, mutta potilaskohtaiset kentät tyhjenevät.
+      const dup = { ...rest, time: nowTime(), description: "", reflection: "", photos: null, ageGroup: "" };
       addCall(s.id, dup);
       toast("Keikka kopioitu");
       renderShiftDetail(s.id);
@@ -719,6 +795,7 @@ function callRow(shiftId, c) {
           ${c.disposition ? `<span class="meta-pill">${esc(dispositionShort(c))}</span>` : `<span class="meta-pill kesken">Kesken</span>`}
           ${c.destination ? `<span class="meta-pill dest">${esc(c.destination)}${c.tehoModule ? " · " + esc(c.tehoModule) : ""}</span>` : ""}
           ${c.disposition === "Kuljetettu" && c.transportCode ? `<span class="meta-pill">Kulj. ${esc(c.transportCode)}${c.transportUrgency ? " " + esc(c.transportUrgency) : ""}</span>` : ""}
+          ${c.ageGroup && c.ageGroup !== "aikuinen" ? `<span class="meta-pill age">${esc(AGE_LABEL[c.ageGroup] || "")}</span>` : ""}
           ${(c.tags || []).map((t) => `<span class="meta-pill tag">${esc(t)}</span>`).join("")}
           ${(c.photos || []).length ? `<span class="meta-pill">📷 ${c.photos.length}</span>` : ""}
         </div>
@@ -823,6 +900,11 @@ function openCallForm(shiftId, existing) {
         </div>
       </label>
     </div>
+    <label>Potilas
+      <div class="seg age-seg" id="c-age">
+        ${AGE_GROUPS.map((a) => `<button type="button" data-a="${a.id}" class="${c.ageGroup === a.id ? "on" : ""}">${a.label}<small>${a.hint}</small></button>`).join("")}
+      </div>
+    </label>
     <label>Tehtäväkoodi (hälytyskoodi)
       <input type="text" id="c-codesearch" list="codelist" value="${esc(c.code || "")}" placeholder="Hae numerolla tai sanalla, esim. 704 tai rintakipu" autocomplete="off">
       <datalist id="codelist">
@@ -920,6 +1002,7 @@ function openCallForm(shiftId, existing) {
         transportCodeName: CODE_MAP.get(transportCode)?.name || "",
         transportUrgency,
         tags: [...new Set([...chipTags, ...extraTags])],
+        ageGroup: document.querySelector("#c-age .on")?.dataset.a || "",
         reflection: val("c-reflect"),
         photos: photos.length ? photos : null,
       };
@@ -1028,6 +1111,14 @@ function openCallForm(shiftId, existing) {
   document.querySelectorAll("#c-tags .chip").forEach((b) => {
     b.onclick = () => b.classList.toggle("on");
   });
+  // Ikäryhmä on valinnainen: uusi napautus samaan poistaa valinnan.
+  document.querySelectorAll("#c-age button").forEach((b) => {
+    b.onclick = () => {
+      const wasOn = b.classList.contains("on");
+      document.querySelectorAll("#c-age button").forEach((x) => x.classList.remove("on"));
+      if (!wasOn) b.classList.add("on");
+    };
+  });
   // Kuvaliitteet
   const photosEl = document.getElementById("c-photos");
   const renderPhotos = () => {
@@ -1079,29 +1170,38 @@ function codeHint(code) {
   if (!info) return "";
   return `<span class="lead-tag" style="--lc:${info.color}">${info.lead}</span> ${esc(info.name)} · <span class="muted">${esc(info.category)}</span>`;
 }
-// Pikavalinta: omat yleisimmät/viimeisimmät koodit, tai oletusjoukko ilman historiaa.
+// Pikavalinta: ehdotukset omasta keikkahistoriasta. Jokainen keikka painaa
+// sitä enemmän, mitä tuoreempi se on (puoliintumisaika 14 päivää), joten lista
+// seuraa sitä mitä nykyisellä asemalla ja tässä jaksossa oikeasti ajetaan
+// eikä jää kiinni kuukausien takaisiin keikkoihin. Kun historiaa on vähän,
+// loput paikat täytetään yleisillä koodeilla.
 const QUICK_DEFAULTS = ["745", "704", "703", "702", "774", "781", "785", "770"];
+const QUICK_HALF_LIFE_DAYS = 14;
 function topCodesForQuickPick(limit = 8) {
-  const freq = {}, lastSeen = {};
+  const score = {};
+  const now = new Date(today() + "T12:00:00");
   for (const c of getAllCalls()) {
-    if (!c.code) continue;
-    freq[c.code] = (freq[c.code] || 0) + 1;
-    const ts = (c.shift?.date || "") + (c.time || "");
-    if (!lastSeen[c.code] || ts > lastSeen[c.code]) lastSeen[c.code] = ts;
+    const code = (c.code || "").toUpperCase();
+    if (!CODE_MAP.has(code) || code.startsWith("X-")) continue;
+    const d = new Date((c.shift?.date || today()) + "T12:00:00");
+    const ageDays = Math.max(0, (now - d) / 86400000);
+    score[code] = (score[code] || 0) + Math.pow(0.5, ageDays / QUICK_HALF_LIFE_DAYS);
   }
-  const codes = Object.keys(freq);
-  if (!codes.length) return QUICK_DEFAULTS.filter((c) => CODE_MAP.has(c)).slice(0, limit);
-  codes.sort((a, b) => (freq[b] - freq[a]) || (lastSeen[b] > lastSeen[a] ? 1 : -1));
-  return codes.slice(0, limit);
+  const fromHistory = Object.keys(score).sort((a, b) => score[b] - score[a]).slice(0, limit);
+  const fill = QUICK_DEFAULTS.filter((c) => CODE_MAP.has(c) && !fromHistory.includes(c));
+  return { codes: [...fromHistory, ...fill].slice(0, limit), fromHistory: fromHistory.length };
 }
 function quickCodesHtml(currentCode) {
   const cur = (currentCode || "").toUpperCase();
-  const codes = topCodesForQuickPick(8);
+  const { codes, fromHistory } = topCodesForQuickPick(8);
   if (!codes.length) return "";
-  return `<div class="qc-label">Pikavalinta</div><div class="qc-row">${codes.map((code) => {
+  const chip = (code, own) => {
     const name = CODE_MAP.get(code)?.name || "";
-    return `<button type="button" class="qc-chip ${cur === code ? "on" : ""}" data-qc="${esc(code)}"><b>${esc(code)}</b> ${esc(name)}</button>`;
-  }).join("")}</div>`;
+    return `<button type="button" class="qc-chip ${own ? "" : "qc-default"} ${cur === code ? "on" : ""}" data-qc="${esc(code)}"><b>${esc(code)}</b> ${esc(name)}</button>`;
+  };
+  const own = codes.slice(0, fromHistory), rest = codes.slice(fromHistory);
+  return `${own.length ? `<div class="qc-label">Omista keikoistasi</div><div class="qc-row">${own.map((c) => chip(c, true)).join("")}</div>` : ""}
+    ${rest.length ? `<div class="qc-label">${own.length ? "Muita yleisiä" : "Yleisiä tehtäviä"}</div><div class="qc-row">${rest.map((c) => chip(c, false)).join("")}</div>` : ""}`;
 }
 // ---- Kiireellisyyspainotukset per tehtäväkoodi ----
 // Työnjako sisällössä (ei toistoa):
@@ -1438,6 +1538,8 @@ function renderStats() {
 
     ${goalsSectionHtml(s)}
 
+    ${unseenHtml()}
+
     ${achievementsHtml(s)}
 
     <h2 class="block-h">🗓️ Aktiivisuuskartta <span class="block-sub">viimeiset 15 viikkoa</span></h2>
@@ -1475,6 +1577,8 @@ function renderStats() {
         <p class="muted">${s.callsPerShift} keikkaa / vuoro · ${s.callCount - s.transported} ei kuljetusta</p>
       </div>
     </div>
+
+    ${ageHtml(s)}
 
     <h2 class="block-h">🎯 Kiireellisyys</h2>
     <p class="muted small">Kuljetetuilla kuljetuksen kiireellisyys, muilla hälytysaste.</p>
@@ -1517,6 +1621,9 @@ function renderStats() {
   const toggle = document.getElementById("act-toggle");
   if (toggle) toggle.querySelectorAll("button").forEach((b) => {
     b.onclick = () => { statsActivityMode = b.dataset.m; renderStats(); };
+  });
+  app.querySelectorAll("[data-unseen]").forEach((b) => {
+    b.onclick = () => openCodeInfo(b.dataset.unseen);
   });
   wireStatsPeriod();
 }
@@ -1896,6 +2003,53 @@ function shortDate(iso) {
 function kpi(value, label) {
   return `<div class="kpi"><div class="kpi-val">${esc(String(value))}</div><div class="kpi-lab">${esc(label)}</div></div>`;
 }
+// Ikäryhmäjakauma. Näkyy vasta, kun ikäryhmä on kirjattu ainakin kerran.
+const AGE_COLORS = { lapsi: "#0ea5b7", aikuinen: "var(--primary)", iakas: "#8b5cf6" };
+function ageHtml(s) {
+  const known = AGE_GROUPS.reduce((n, a) => n + s.byAge[a.id], 0);
+  if (!known) return "";
+  const max = Math.max(1, ...AGE_GROUPS.map((a) => s.byAge[a.id]));
+  const missing = s.callCount - known;
+  return `<h2 class="block-h">👥 Potilaat ikäryhmittäin</h2>
+    <div class="card">
+      ${AGE_GROUPS.map((a) => bar(`${a.label} ${a.hint}`, s.byAge[a.id], max, AGE_COLORS[a.id])).join("")}
+      ${missing ? `<p class="muted small" style="margin:8px 0 0">${missing} keikassa ikäryhmää ei ole kirjattu.</p>` : ""}
+    </div>`;
+}
+
+// Mitä ensihoidon tehtävätyyppejä ei ole vielä nähty koko jakson aikana.
+// Logistiikkatehtävät (siirrot, varallaolo, aikatilaukset) eivät ole
+// kliinistä oppimista, joten ne jätetään pois.
+const UNSEEN_SKIP = new Set(["707", "790", "792", "793", "794"]);
+function unseenHtml() {
+  const calls = getAllCalls();
+  if (!calls.length) return "";
+  const seen = new Set(calls.map((c) => (c.code || "").toUpperCase()));
+  const eh = CODE_GROUPS.find((g) => g.id === "eh");
+  const cats = eh.categories
+    .map((cat) => ({ title: cat.title, codes: cat.codes.filter(([code]) => !UNSEEN_SKIP.has(code)) }))
+    .filter((cat) => cat.codes.length);
+  const total = cats.reduce((n, cat) => n + cat.codes.length, 0);
+  const unseenCats = cats
+    .map((cat) => ({ ...cat, codes: cat.codes.filter(([code]) => !seen.has(code)) }))
+    .filter((cat) => cat.codes.length);
+  const unseenCount = unseenCats.reduce((n, cat) => n + cat.codes.length, 0);
+  const pct = Math.round(((total - unseenCount) / total) * 100);
+  // Ikäryhmäaukko vain, jos ikäryhmiä ylipäätään kirjataan – muuten väite olisi väärä.
+  const aged = calls.filter((c) => c.ageGroup);
+  const ageGaps = aged.length >= 5 ? AGE_GROUPS.filter((a) => !aged.some((c) => c.ageGroup === a.id)) : [];
+  return `<h2 class="block-h">🧭 Vielä näkemättä <span class="block-sub">${total - unseenCount}/${total} tehtävätyyppiä nähty</span></h2>
+    <div class="card unseen-card">
+      <div class="bartrack"><div class="barfill" style="width:${pct}%"></div></div>
+      ${ageGaps.length ? `<p class="unseen-age">Ei vielä yhtään potilasta ryhmästä: <b>${ageGaps.map((a) => `${a.label.toLowerCase()} (${a.hint})`).join(", ")}</b></p>` : ""}
+      ${unseenCount ? unseenCats.map((cat) => `
+        <div class="un-cat">${esc(cat.title)}</div>
+        <div class="qc-row">${cat.codes.map(([code, name]) => `<button type="button" class="qc-chip qc-default" data-unseen="${code}"><b>${code}</b> ${esc(name)}</button>`).join("")}</div>`).join("")
+        : `<p class="unseen-age"><b>Kaikki ensihoidon tehtävätyypit nähty.</b></p>`}
+      ${unseenCount ? `<p class="muted small" style="margin:10px 0 0">Napauta koodia nähdäksesi, mihin kannattaa varautua.</p>` : ""}
+    </div>`;
+}
+
 function goalsSectionHtml(s) {
   const goals = getSettings().goals || [];
   if (!goals.length) return "";
