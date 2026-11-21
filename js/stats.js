@@ -228,7 +228,7 @@ function isoWeek(dateStr) {
   return `${target.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
 }
 
-function weekLabel(wk) {
+export function weekLabel(wk) {
   const m = wk.match(/W(\d+)$/);
   return m ? `vk ${parseInt(m[1], 10)}` : wk;
 }
