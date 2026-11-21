@@ -6,13 +6,13 @@ import {
 } from "./storage.js";
 import { CODE_GROUPS, CODE_MAP, ALL_CODES, URGENCY, PROCEDURES, X_SUBCODES } from "./codes.js";
 import { codeInfo } from "./codeinfo.js";
-import { computeStats, shiftHours, DAYPARTS, WEEKDAYS, effectiveUrgency } from "./stats.js";
+import { computeStats, shiftHours, DAYPARTS, WEEKDAYS, effectiveUrgency, weekLabel } from "./stats.js";
 import { ekgWaveSvg } from "./ekgwave.js";
 import { STATIONS, stationLabel, ALL_UNITS, findStation, stationColor, DEFAULT_ACCENT, unitLevel } from "./stations.js";
 
 // ---------- Lista + oma syöte -valitsimet (asema / yksikkö) ----------
 // Sovelluksen versio – pidä samana kuin sw.js:n välimuistiversio.
-const APP_VERSION = "v68";
+const APP_VERSION = "v69";
 
 const CUSTOM = "__custom__";
 
@@ -298,7 +298,8 @@ function renderHome() {
   });
   const body = document.getElementById("home-body");
   if (homeView === "calendar") body.innerHTML = calendarHtml(shifts);
-  else body.innerHTML = shiftGroupsHtml(shifts);
+  // Tänään-kortissa näkyvä vuoro ei toistu listassa heti sen alla.
+  else body.innerHTML = shiftGroupsHtml(curShift ? shifts.filter((x) => x.id !== curShift.id) : shifts);
 
   if (homeView === "calendar") {
     document.getElementById("cal-prev").onclick = () => { calCursor.setMonth(calCursor.getMonth() - 1); renderHome(); };
@@ -454,6 +455,21 @@ function shiftStartMin(s) {
   const [h, m] = t.split(":").map(Number);
   return h * 60 + m;
 }
+// Keikan paikka vuorossa minuutteina vuoron alusta. Yövuorossa 00:30 on
+// myöhemmin kuin 23:00, vaikka kellonaikana pienempi. Ilman aikaa = alkuun.
+function callShiftMinute(shift, c) {
+  if (!c.time) return -1;
+  const [h, m] = c.time.split(":").map(Number);
+  let min = h * 60 + m;
+  if (min < shiftStartMin(shift)) min += 24 * 60;
+  return min;
+}
+// Uusin ensin: ensin päivämäärä, sitten paikka vuorossa.
+function newestCallFirst(a, b) {
+  if (a.shift.date !== b.shift.date) return a.shift.date < b.shift.date ? 1 : -1;
+  return callShiftMinute(b.shift, b) - callShiftMinute(a.shift, a);
+}
+
 function shiftTypeName(s) {
   return s.type === "day" ? "Päivävuoro" : s.type === "night" ? "Yövuoro" : "Vuoro";
 }
@@ -629,12 +645,13 @@ function renderShiftDetail(id) {
   const s = getShift(id);
   if (!s) { location.hash = "#/"; return; }
   applyShiftAccent(s);
-  const calls = (s.calls || []).slice();
+  // Uusin keikka ylimpänä: vuoron aikana kiinnostaa juuri edellinen tehtävä.
+  const calls = (s.calls || []).slice().sort((a, b) => callShiftMinute(s, b) - callShiftMinute(s, a));
   const head = s.type === "day" ? "Päivävuoro 9–21"
     : s.type === "night" ? "Yövuoro 21–9"
       : `Vuoro ${esc(s.startTime || "")}–${esc(s.endTime || "")}`;
   app.innerHTML = `
-    <header class="page-head">
+    <header class="page-head stacked">
       <div>
         <a class="back" href="#/">‹ Vuorot</a>
         <h1>${formatDate(s.date)}</h1>
@@ -1298,7 +1315,7 @@ function renderCalls() {
     for (const s of getShifts()) for (const c of s.calls || []) out.push({ ...c, shift: s });
     return out;
   })();
-  calls.sort((a, b) => (a.shift.date + (a.time || "") < b.shift.date + (b.time || "") ? 1 : -1));
+  calls.sort(newestCallFirst);
   const incompleteCount = calls.filter((c) => !c.disposition).length;
 
   const f = callFilter;
@@ -1460,8 +1477,9 @@ function renderStats() {
     <p class="muted small">Kuljetetuilla kuljetuksen kiireellisyys, muilla hälytysaste.</p>
     <div class="card">${donutHtml(urgSegments, { center: s.callCount, sub: "keikkaa" })}</div>
 
+    ${leadSegments.length > 1 ? `
     <h2 class="block-h">🛡️ Johtovastuu</h2>
-    <div class="card">${leadSegments.length ? donutHtml(leadSegments, { center: s.callCount, sub: "keikkaa" }) : `<p class="muted">Ei dataa.</p>`}</div>
+    <div class="card">${donutHtml(leadSegments, { center: s.callCount, sub: "keikkaa" })}</div>` : ""}
 
     <h2 class="block-h">🔁 Hälytys → kuljetus</h2>
     ${s.compare.total ? `
@@ -1749,7 +1767,8 @@ function insightsHtml(s) {
   if (s.busiestDaypart) items.push(`Vilkkain vuorokaudenaika: <b>${s.busiestDaypart.label} (${s.busiestDaypart.short})</b>`);
   if (s.peakWeekdayIdx != null) items.push(`Vilkkain viikonpäivä: <b>${WEEKDAYS[s.peakWeekdayIdx]}</b>`);
   const ds = s.shiftTypeCalls.day, ns = s.shiftTypeCalls.night;
-  if (ds || ns) items.push(ns > ds ? `Yövuoroissa enemmän keikkoja (${ns} vs ${ds})` : ds > ns ? `Päivävuoroissa enemmän keikkoja (${ds} vs ${ns})` : `Päivä- ja yövuorot yhtä vilkkaita`);
+  // Vertailu vain, jos jaksolla on molempia vuorotyyppejä – muuten "27 vs 0" on itsestäänselvyys.
+  if (s.shiftTypeCount.day && s.shiftTypeCount.night) items.push(ns > ds ? `Yövuoroissa enemmän keikkoja (${ns} vs ${ds})` : ds > ns ? `Päivävuoroissa enemmän keikkoja (${ds} vs ${ns})` : `Päivä- ja yövuorot yhtä vilkkaita`);
   if (s.distinctCodes) items.push(`Eri tehtäväkoodeja: <b>${s.distinctCodes}</b>`);
   if (!items.length) return "";
   return `<div class="insights">${items.map((t) => `<div class="insight">💡 ${t}</div>`).join("")}</div>`;
@@ -1804,7 +1823,9 @@ function weekdayHtml(hist) {
 // Vuorokaudenaika × kiireellisyys + top-koodit
 function daypartHtml(dayparts) {
   const maxTotal = Math.max(1, ...dayparts.map((d) => d.total));
-  return dayparts.map((d) => {
+  // Tyhjät vuorokaudenajat pois: päivävuoroissa yö on aina nolla eikä kerro mitään.
+  const shown = dayparts.some((d) => d.total) ? dayparts.filter((d) => d.total) : dayparts;
+  return shown.map((d) => {
     const segs = ["A", "B", "C", "D"].map((k) => d.urg[k] ? `<span class="seg-fill" style="flex:${d.urg[k]};background:${URGENCY[k].color}" title="${k}: ${d.urg[k]}"></span>` : "").join("");
     const width = Math.max(Math.round((d.total / maxTotal) * 100), d.total ? 8 : 3);
     const codes = d.topCodes && d.topCodes.length

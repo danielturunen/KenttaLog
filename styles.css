@@ -93,6 +93,10 @@ a { color: inherit; text-decoration: none; }
 
 /* ---------- Header ---------- */
 .page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin: 4px 0 16px; }
+/* Pitkän tietorivin otsikko (vuoron näkymä): toiminnot omalle rivilleen, jotta
+   tietorivi saa koko leveyden eikä ahtaudu neljälle riville nappien viereen. */
+.page-head.stacked { flex-direction: column; align-items: stretch; gap: 10px; }
+.page-head.stacked .head-actions { justify-content: flex-start; }
 .back { color: var(--muted); font-size: .9rem; display: inline-block; margin-bottom: 5px; font-weight: 600; }
 .section-head { display: flex; align-items: center; justify-content: space-between; margin: 20px 0 12px; }
 .block-h { margin: 28px 0 12px; letter-spacing: -.01em; }
@@ -125,11 +129,10 @@ a { color: inherit; text-decoration: none; }
 
 /* ---------- Stats charts ---------- */
 .small { font-size: .8rem; }
-.kpis-4 { grid-template-columns: repeat(2, 1fr); }
 .chart-card { padding: 16px 14px 12px; }
 .toggle-seg { display: inline-flex; margin-bottom: 12px; }
 
-.insights { display: flex; flex-direction: column; gap: 7px; margin-bottom: 6px; }
+.insights { display: flex; flex-direction: column; gap: 7px; margin: 14px 0 6px; }
 .insight {
   background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 14%, var(--surface)), var(--surface));
   border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border));
@@ -269,11 +272,18 @@ a { color: inherit; text-decoration: none; }
 }
 .kpi-val { font-size: 1.55rem; font-weight: 800; letter-spacing: -.02em; }
 .kpi-lab { font-size: .73rem; color: var(--muted); margin-top: 3px; font-weight: 600; }
+/* Neljä tunnuslukua yhdelle riville. Aiempi 2-sarakkeinen sääntö oli
+   tiedostossa ennen .kpis-sääntöä ja hävisi sille, joten neljäs luku jäi
+   yksin omalle rivilleen. */
+.kpis.kpis-4 { grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.kpis-4 .kpi { padding: 13px 4px; }
+.kpis-4 .kpi-val { font-size: 1.3rem; }
+.kpis-4 .kpi-lab { font-size: .68rem; line-height: 1.25; }
 .bars { display: flex; flex-direction: column; gap: 9px; }
 .barrow { display: flex; align-items: center; gap: 10px; }
 .barlab { width: 84px; font-size: .85rem; flex-shrink: 0; font-weight: 600; }
 .bartrack { flex: 1; background: var(--surface-2); border-radius: 999px; height: 15px; overflow: hidden; }
-.barfill { height: 100%; border-radius: 999px; transition: width .4s ease; min-width: 3px; }
+.barfill { height: 100%; border-radius: 999px; transition: width .4s ease; min-width: 3px; background: var(--primary); }
 .barval { width: 34px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
 .list.compact { gap: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
 .ranked { display: flex; align-items: center; gap: 9px; padding: 12px 15px; border-bottom: 1px solid var(--border); }
@@ -667,8 +677,11 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; }
 .qs-note { margin: 9px 0 0; font-size: .8rem; color: var(--muted); text-align: center; }
 
 /* ---------- Duplicate button on call row ---------- */
+/* Oma sarake rivin oikeassa alakulmassa. Aiemmin nappi oli absoluuttisesti
+   oikeassa yläkulmassa ja peitti keikan kellonajan. */
 .dup-btn {
-  position: absolute; right: 8px; top: 8px; background: none; border: none; color: var(--muted);
+  flex-shrink: 0; align-self: flex-end; margin: -4px -6px -6px 0;
+  min-width: 36px; min-height: 36px; background: none; border: none; color: var(--muted);
   font-size: 1.1rem; cursor: pointer; padding: 4px 6px; border-radius: var(--radius-sm); opacity: .5; transition: opacity .15s;
 }
 .dup-btn:hover, .dup-btn:active { opacity: 1; background: var(--surface-2); }
