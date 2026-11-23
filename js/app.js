@@ -13,7 +13,7 @@ import { TAB_ICONS, stationIcon, stationMotif } from "./icons.js";
 
 // ---------- Lista + oma syöte -valitsimet (asema / yksikkö) ----------
 // Sovelluksen versio – pidä samana kuin sw.js:n välimuistiversio.
-const APP_VERSION = "v74";
+const APP_VERSION = "v75";
 
 const CUSTOM = "__custom__";
 
@@ -420,8 +420,8 @@ function todayCardHtml(shifts) {
     </div>`;
 }
 
-// Asema kuvakkeella, yksiköllä ja erityisosaamisella. Tuntematon (itse
-// kirjoitettu) asema näkyy tekstinä ilman erityisosaamista.
+// Asema kuvakkeella ja yksiköllä. Tuntematon (itse kirjoitettu) asema näkyy
+// tekstinä yleiskuvakkeella.
 function stationLineHtml(stationValue, unit, extra = "") {
   const st = findStation(stationValue);
   if (!stationValue) {
@@ -432,7 +432,6 @@ function stationLineHtml(stationValue, unit, extra = "") {
     <span class="sl-ic">${stationIcon(st, 18)}</span>
     <span class="sl-text">
       <span class="sl-name">${esc(name)}${st ? ` <span class="sc-code">${esc(st.code)}</span>` : ""}${unit ? ` · ${esc(unit)}` : ""}</span>
-      ${st?.spec ? `<span class="sl-spec">${esc(st.spec.label)}</span>` : ""}
     </span>
     ${extra}
   </div>`;
@@ -3697,7 +3696,7 @@ function openStationPicker() {
       <div class="st-pick">
         ${STATIONS.map((s) => `<button type="button" class="st-opt ${cur === s ? "on" : ""}" data-st="${esc(stationLabel(s))}" style="--stc:${s.color}">
           <span class="st-ic">${stationIcon(s, 18)}</span>
-          <span class="st-text"><span class="st-name">${esc(s.name)} <span class="sc-code">${esc(s.code)}</span></span>${s.spec ? `<span class="st-spec">${esc(s.spec.label)}</span>` : ""}</span>
+          <span class="st-text"><span class="st-name">${esc(s.name)} <span class="sc-code">${esc(s.code)}</span></span></span>
         </button>`).join("")}
       </div>
       ${units.length ? `<label>Yksikkö

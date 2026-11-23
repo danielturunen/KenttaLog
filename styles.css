@@ -860,7 +860,6 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: -.03em; line-height: 1.0
 }
 .sl-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
 .sl-name { font-weight: 700; font-size: .95rem; }
-.sl-spec { font-size: .78rem; font-weight: 650; color: color-mix(in srgb, var(--sc, var(--primary)) 60%, var(--text)); }
 .station-line .link-btn { margin-left: auto; align-self: center; }
 .page-head .station-line { margin-top: 10px; }
 
@@ -870,11 +869,13 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: -.03em; line-height: 1.0
   background: linear-gradient(155deg, color-mix(in srgb, var(--sc, var(--primary)) 26%, var(--surface)) 0%, var(--surface) 72%);
   border: 1px solid color-mix(in srgb, var(--sc, var(--primary)) 32%, var(--hair));
 }
+/* Kuvio on tunnelmaa, ei viesti: niin hento, että sen huomaa vasta toisella
+   silmäyksellä, ja häivytetty pois tekstin alta. */
 .motif {
-  position: absolute; z-index: -1; right: -6px; top: 0; height: 100%; width: 78%;
-  color: var(--sc, var(--primary)); opacity: .24; pointer-events: none;
-  -webkit-mask-image: linear-gradient(to left, #000 35%, transparent);
-          mask-image: linear-gradient(to left, #000 35%, transparent);
+  position: absolute; z-index: -1; right: -6px; top: 0; height: 100%; width: 70%;
+  color: var(--sc, var(--primary)); opacity: .1; pointer-events: none;
+  -webkit-mask-image: linear-gradient(to left, #000 10%, transparent 80%);
+          mask-image: linear-gradient(to left, #000 10%, transparent 80%);
 }
 .tc-live { display: inline-flex; align-items: center; gap: 7px; letter-spacing: .06em; font-size: .74rem; }
 .tc-live.is-live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 22%, transparent); }
@@ -896,8 +897,6 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: -.03em; line-height: 1.0
   color: var(--stc); background: color-mix(in srgb, var(--stc) 16%, transparent);
 }
 .st-text { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
-.st-spec { font-size: .74rem; font-weight: 600; color: var(--muted); }
-.st-opt.on .st-spec { color: color-mix(in srgb, var(--stc) 60%, var(--text)); }
 
 /* ---------- Saavutettavuus: liike, läpinäkyvyys, kontrasti ----------
    Käyttöjärjestelmän asetukset ohittavat sovelluksen oletukset. Vähennetty

@@ -61,7 +61,7 @@ const MOTIFS = {
   waves: () => wavesRows(14, 140, 15),
   harbor: () => `${wavesRows(70, 140, 14, 6)}<path d="M196 10s-22 24-22 40a22 22 0 0 0 44 0c0-16-22-40-22-40Z"/>`,
   hex: () => hexGrid(),
-  mirg: () => `<g transform="translate(140 4) scale(4)" vector-effect="non-scaling-stroke"><path vector-effect="non-scaling-stroke" d="M2.5 5h13M9 5v2.5"/><path vector-effect="non-scaling-stroke" d="M4.5 11A3.5 3.5 0 0 1 8 7.5h5a2 2 0 0 1 2 2V15H8a3.5 3.5 0 0 1-3.5-3.5Z"/><path vector-effect="non-scaling-stroke" d="M15 10.2h5.5M20.5 8v4.5M6 18.5h9.5M8 15v3.5M13 15v3.5"/></g>${wavesRows(108, 140, 12, 6)}`,
+  mirg: () => `<g transform="translate(166 14) scale(3)" vector-effect="non-scaling-stroke"><path vector-effect="non-scaling-stroke" d="M2.5 5h13M9 5v2.5"/><path vector-effect="non-scaling-stroke" d="M4.5 11A3.5 3.5 0 0 1 8 7.5h5a2 2 0 0 1 2 2V15H8a3.5 3.5 0 0 1-3.5-3.5Z"/><path vector-effect="non-scaling-stroke" d="M15 10.2h5.5M20.5 8v4.5M6 18.5h9.5M8 15v3.5M13 15v3.5"/></g>${wavesRows(108, 140, 12, 6)}`,
   grid: () => {
     let c = "";
     for (let y = 8; y < 140; y += 16) for (let x = 8; x < 240; x += 16) c += `<circle cx="${x}" cy="${y}" r="1.1" fill="currentColor" stroke="none"/>`;
