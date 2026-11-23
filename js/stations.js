@@ -1,31 +1,26 @@
 // Helsingin pelastuslaitoksen pelastusasemat ja yksikkötunnukset.
 // Lähde: käyttäjän toimittama asemalista.
 //
-// spec = aseman erityisosaaminen tai tunnistettava rooli, jos se on julkisista
-// lähteistä varmistettu (Helsingin pelastuslaitoksen sivut, palvelutaso-
-// päätös 2024–2026, Konalan aseman avaustiedote 2023, Pelastustieto 6/2012
-// Malmin MIRG-ryhmästä). motif = kuvio, jolla
-// asema tunnistetaan sovelluksessa. Asemille, joiden erityisosaamista ei
-// löytynyt, ei keksitä sellaista: ne saavat neutraalin kuvion.
-// MIRG = Maritime Incident Response Group: helikopterilla aluksille kuljetettava
-// pelastusryhmä.
+// motif = aseman taustakuvio, joka viittaa aseman erityisosaamiseen. Vain
+// julkisista lähteistä varmistetut (palvelutasopäätös 2024–2026, Konalan
+// avaustiedote 2023, Pelastustieto 6/2012); muut saavat neutraalin kuvion.
+//   radar  = Kallio, keskuspelastusasema
+//   waves  = Erottaja, pelastussukeltajat
+//   hex    = Konala, CBRNE-erikoisyksikkö
+//   mirg   = Malmi, MIRG-ryhmä (helikopterilla aluksille)
+//   harbor = Herttoniemi, venepelastus ja öljyntorjunta
 
 export const STATIONS = [
-  { code: "AS.10", name: "Kallio", full: "Kallion keskuspelastusasema", address: "Agricolankatu 15, 00530 Helsinki", units: ["HE1211", "HE1311", "HE1312"], color: "#e5484d",
-    spec: { label: "Keskuspelastusasema" }, motif: "radar" },
-  { code: "AS.20", name: "Erottaja", full: "Erottajan pelastusasema", address: "Korkeavuorenkatu 26, 00130 Helsinki", units: ["HE1321"], color: "#e8731f",
-    spec: { label: "Pelastussukeltajat" }, motif: "waves" },
+  { code: "AS.10", name: "Kallio", full: "Kallion keskuspelastusasema", address: "Agricolankatu 15, 00530 Helsinki", units: ["HE1211", "HE1311", "HE1312"], color: "#e5484d", motif: "radar" },
+  { code: "AS.20", name: "Erottaja", full: "Erottajan pelastusasema", address: "Korkeavuorenkatu 26, 00130 Helsinki", units: ["HE1321"], color: "#e8731f", motif: "waves" },
   { code: "AS.21", name: "Jätkäsaari", full: "Jätkäsaaren pelastusasema", address: "Tyynenmerenkatu 1, 00220 Helsinki", units: ["HE1322"], note: "Vuoronvaihto Erottajalla", color: "#d8a200" },
   { code: "AS.30", name: "Haaga", full: "Haagan pelastusasema", address: "Vanha Turun maantie 2, 00320 Helsinki", units: ["HE1231"], color: "#46a758" },
-  { code: "AS.31", name: "Konala", full: "Konalan pelastusasema", address: "Muonamiehentie 13, 00390 Helsinki", units: ["HE1331"], color: "#12a594",
-    spec: { label: "CBRNE-erikoisyksikkö" }, motif: "hex" },
+  { code: "AS.31", name: "Konala", full: "Konalan pelastusasema", address: "Muonamiehentie 13, 00390 Helsinki", units: ["HE1331"], color: "#12a594", motif: "hex" },
   { code: "AS.40", name: "Käpylä", full: "Käpylän pelastusasema", address: "Kullervonkatu 7, 00600 Helsinki", units: ["HE1341", "HE1342"], color: "#0ea5b7" },
-  { code: "AS.50", name: "Malmi", full: "Malmin pelastusasema", address: "Malmin lentoasema, 00700 Helsinki", units: ["HE1251", "HE1252"], color: "#3b82f6",
-    spec: { label: "MIRG – alusonnettomuudet" }, motif: "mirg" },
+  { code: "AS.50", name: "Malmi", full: "Malmin pelastusasema", address: "Malmin lentoasema, 00700 Helsinki", units: ["HE1251", "HE1252"], color: "#3b82f6", motif: "mirg" },
   { code: "AS.60", name: "Mellunkylä", full: "Mellunkylän pelastusasema", address: "Linnanpajantie 6, 00950 Helsinki", units: ["HE1261", "HE1362", "HE1363"], color: "#6366f1" },
   { code: "AS.61", name: "Kontula", full: "Kontulan pelastusasema", address: "Lirokuja 6, 00940 Helsinki", units: ["HE1361"], color: "#8b5cf6" },
-  { code: "AS.70", name: "Herttoniemi", full: "Herttoniemen pelastusasema", address: "Sorvaajankatu 16, 00880 Helsinki", units: ["HE1371"], color: "#d6409f",
-    spec: { label: "Venepelastus ja öljyntorjunta" }, motif: "harbor" },
+  { code: "AS.70", name: "Herttoniemi", full: "Herttoniemen pelastusasema", address: "Sorvaajankatu 16, 00880 Helsinki", units: ["HE1371"], color: "#d6409f", motif: "harbor" },
 ];
 
 // Oletuskorostusväri kun asemaa ei ole valittu.
